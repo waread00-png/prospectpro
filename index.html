@@ -1,0 +1,2545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ProspectPro — Fundraising Intelligence Platform</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+:root {
+  --blue: #1a56db;
+  --blue-light: #e1effe;
+  --blue-dark: #1e40af;
+  --green: #059669;
+  --green-light: #d1fae5;
+  --amber: #d97706;
+  --amber-light: #fef3c7;
+  --red: #dc2626;
+  --red-light: #fee2e2;
+  --purple: #7c3aed;
+  --purple-light: #ede9fe;
+  --indigo: #4f46e5;
+  --indigo-light: #e0e7ff;
+  --gray-50: #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --gray-300: #d1d5db;
+  --gray-400: #9ca3af;
+  --gray-500: #6b7280;
+  --gray-600: #4b5563;
+  --gray-700: #374151;
+  --gray-800: #1f2937;
+  --gray-900: #111827;
+  --sidebar-w: 240px;
+  --header-h: 56px;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background: var(--gray-50); color: var(--gray-800); font-size: 14px; line-height: 1.5; }
+a { color: var(--blue); text-decoration: none; }
+button { cursor: pointer; font-family: inherit; font-size: 14px; border: none; border-radius: 6px; padding: 8px 16px; transition: all .15s; }
+button:hover { opacity: 0.9; }
+input, select, textarea { font-family: inherit; font-size: 14px; border: 1px solid var(--gray-300); border-radius: 6px; padding: 8px 12px; outline: none; transition: border-color .15s; width: 100%; }
+input:focus, select:focus, textarea:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(26,86,219,.1); }
+textarea { resize: vertical; min-height: 80px; }
+table { width: 100%; border-collapse: collapse; }
+th { background: var(--gray-50); font-weight: 600; text-align: left; padding: 10px 12px; border-bottom: 2px solid var(--gray-200); font-size: 12px; text-transform: uppercase; letter-spacing: .5px; color: var(--gray-500); white-space: nowrap; user-select: none; cursor: pointer; }
+th:hover { color: var(--gray-700); }
+td { padding: 10px 12px; border-bottom: 1px solid var(--gray-100); }
+tr:hover td { background: var(--gray-50); }
+.btn-primary { background: var(--blue); color: #fff; }
+.btn-primary:hover { background: var(--blue-dark); }
+.btn-success { background: var(--green); color: #fff; }
+.btn-danger { background: var(--red); color: #fff; }
+.btn-warning { background: var(--amber); color: #fff; }
+.btn-outline { background: #fff; color: var(--gray-700); border: 1px solid var(--gray-300); }
+.btn-outline:hover { background: var(--gray-50); border-color: var(--gray-400); }
+.btn-sm { padding: 4px 10px; font-size: 12px; }
+
+/* Layout */
+#sidebar {
+  position: fixed; top: 0; left: 0; bottom: 0; width: var(--sidebar-w);
+  background: var(--gray-900); color: #fff; z-index: 100;
+  display: flex; flex-direction: column; transition: transform .2s;
+}
+#sidebar .logo { padding: 16px 20px; font-size: 18px; font-weight: 700; border-bottom: 1px solid rgba(255,255,255,.1); display: flex; align-items: center; gap: 10px; }
+#sidebar .logo span { color: var(--blue-light); }
+#sidebar nav { flex: 1; padding: 12px 0; overflow-y: auto; }
+#sidebar nav a {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 20px; color: var(--gray-400);
+  font-size: 14px; font-weight: 500; transition: all .15s;
+  position: relative; text-decoration: none;
+}
+#sidebar nav a:hover { color: #fff; background: rgba(255,255,255,.05); }
+#sidebar nav a.active { color: #fff; background: rgba(255,255,255,.1); }
+#sidebar nav a.active::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--blue); border-radius: 0 3px 3px 0; }
+#sidebar nav a .nav-icon { width: 20px; text-align: center; font-size: 16px; }
+#sidebar nav a .badge-count {
+  margin-left: auto; background: var(--red); color: #fff;
+  font-size: 11px; font-weight: 600; padding: 1px 6px;
+  border-radius: 10px; min-width: 18px; text-align: center;
+}
+#sidebar .security-badge {
+  margin: 12px 16px; padding: 10px 12px; background: rgba(5,150,105,.15);
+  border-radius: 8px; border: 1px solid rgba(5,150,105,.3);
+  font-size: 11px; color: #a7f3d0;
+}
+#sidebar .security-badge strong { display: block; color: #6ee7b7; margin-bottom: 2px; font-size: 12px; }
+.menu-toggle {
+  display: none; position: fixed; top: 12px; left: 12px; z-index: 200;
+  background: var(--gray-800); color: #fff; width: 36px; height: 36px;
+  border-radius: 8px; font-size: 20px; align-items: center; justify-content: center; border: none;
+}
+
+#main { margin-left: var(--sidebar-w); min-height: 100vh; }
+#header {
+  height: var(--header-h); background: #fff; border-bottom: 1px solid var(--gray-200);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 24px; position: sticky; top: 0; z-index: 50;
+}
+#header h1 { font-size: 18px; font-weight: 600; color: var(--gray-800); }
+#header .header-actions { display: flex; align-items: center; gap: 8px; }
+#content { padding: 24px; }
+
+.card { background: #fff; border: 1px solid var(--gray-200); border-radius: 10px; padding: 20px; margin-bottom: 16px; }
+.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.card-header h2 { font-size: 16px; font-weight: 600; }
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px,1fr)); gap: 16px; margin-bottom: 24px; }
+.stat-card { background: #fff; border: 1px solid var(--gray-200); border-radius: 10px; padding: 16px 20px; }
+.stat-card .stat-label { font-size: 12px; color: var(--gray-500); text-transform: uppercase; letter-spacing: .5px; font-weight: 600; }
+.stat-card .stat-value { font-size: 28px; font-weight: 700; color: var(--gray-800); margin-top: 4px; }
+.stat-card .stat-sub { font-size: 12px; color: var(--gray-500); margin-top: 2px; }
+
+.score-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 38px; height: 38px; border-radius: 50%;
+  font-weight: 700; font-size: 13px; color: #fff;
+}
+.score-badge.score-high { background: var(--green); }
+.score-badge.score-mid { background: var(--amber); }
+.score-badge.score-low { background: var(--gray-400); }
+.score-badge-sm { width: 28px; height: 28px; font-size: 11px; }
+
+.stage-badge {
+  display: inline-block; padding: 3px 10px; border-radius: 12px;
+  font-size: 12px; font-weight: 600; white-space: nowrap;
+}
+.stage-prospect { background: var(--indigo-light); color: var(--indigo); }
+.stage-cultivate { background: var(--amber-light); color: var(--amber); }
+.stage-solicit { background: var(--green-light); color: var(--green); }
+.stage-steward { background: var(--purple-light); color: var(--purple); }
+
+.alert-card {
+  padding: 12px 16px; border-radius: 8px; margin-bottom: 8px;
+  display: flex; align-items: center; gap: 12px; cursor: pointer;
+  transition: transform .1s;
+}
+.alert-card:hover { transform: translateX(4px); }
+.alert-critical { background: var(--red-light); border-left: 4px solid var(--red); }
+.alert-warning { background: var(--amber-light); border-left: 4px solid var(--amber); }
+.alert-info { background: var(--blue-light); border-left: 4px solid var(--blue); }
+
+.kanban { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; min-height: 400px; }
+.kanban-col { background: var(--gray-100); border-radius: 10px; padding: 12px; }
+.kanban-col-header { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; padding: 8px 4px; display: flex; justify-content: space-between; align-items: center; }
+.kanban-col-header .count { background: rgba(0,0,0,.1); padding: 2px 8px; border-radius: 10px; font-size: 11px; }
+.kanban-card {
+  background: #fff; border: 1px solid var(--gray-200); border-radius: 8px;
+  padding: 12px; margin-top: 8px; cursor: pointer; transition: box-shadow .15s;
+}
+.kanban-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+.kanban-card .kc-name { font-weight: 600; font-size: 14px; }
+.kanban-card .kc-occ { font-size: 12px; color: var(--gray-500); margin-top: 2px; }
+.kanban-card .kc-row { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
+.kanban-card .kc-pledge { font-size: 13px; font-weight: 600; color: var(--green); }
+.kanban-card .kc-actions { display: flex; gap: 4px; margin-top: 8px; }
+.kanban-card .kc-actions button { padding: 3px 8px; font-size: 11px; }
+
+.drop-zone {
+  border: 2px dashed var(--gray-300); border-radius: 12px; padding: 48px 24px;
+  text-align: center; cursor: pointer; transition: all .2s; background: var(--gray-50);
+}
+.drop-zone:hover, .drop-zone.dragover { border-color: var(--blue); background: var(--blue-light); }
+.drop-zone .dz-icon { font-size: 48px; margin-bottom: 12px; }
+.drop-zone .dz-text { font-size: 16px; font-weight: 600; color: var(--gray-700); }
+.drop-zone .dz-sub { font-size: 13px; color: var(--gray-500); margin-top: 4px; }
+
+.mapping-grid { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: center; }
+.mapping-grid .arrow { color: var(--gray-400); font-size: 18px; text-align: center; }
+.mapping-grid label { font-weight: 600; font-size: 13px; color: var(--gray-600); padding: 4px 0; }
+
+.modal-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,.5); z-index: 500; display: flex;
+  align-items: center; justify-content: center; padding: 20px;
+}
+.modal {
+  background: #fff; border-radius: 12px; width: 100%; max-width: 720px;
+  max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,.2);
+}
+.modal-header { padding: 16px 24px; border-bottom: 1px solid var(--gray-200); display: flex; justify-content: space-between; align-items: center; }
+.modal-header h2 { font-size: 18px; font-weight: 600; }
+.modal-close { background: none; font-size: 24px; color: var(--gray-400); padding: 4px; border: none; }
+.modal-close:hover { color: var(--gray-700); }
+.modal-body { padding: 24px; }
+.modal-footer { padding: 16px 24px; border-top: 1px solid var(--gray-200); display: flex; justify-content: flex-end; gap: 8px; }
+
+.tabs { display: flex; border-bottom: 2px solid var(--gray-200); margin-bottom: 16px; }
+.tab-btn { padding: 10px 20px; font-weight: 600; color: var(--gray-500); background: none; border-radius: 0; position: relative; border: none; }
+.tab-btn:hover { color: var(--gray-700); }
+.tab-btn.active { color: var(--blue); }
+.tab-btn.active::after { content: ''; position: absolute; bottom: -2px; left: 0; right: 0; height: 2px; background: var(--blue); }
+
+.form-group { margin-bottom: 16px; }
+.form-group label { display: block; font-size: 13px; font-weight: 600; color: var(--gray-600); margin-bottom: 4px; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+.slider-group { margin-bottom: 16px; }
+.slider-group label { display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; color: var(--gray-600); margin-bottom: 4px; }
+.slider-group input[type="range"] { width: 100%; padding: 0; border: none; height: 6px; -webkit-appearance: none; appearance: none; background: var(--gray-200); border-radius: 3px; outline: none; }
+.slider-group input[type="range"]:focus { box-shadow: none; }
+.slider-group input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--blue); cursor: pointer; }
+.slider-group input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: var(--blue); cursor: pointer; border: none; }
+
+.outreach-content { background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: 8px; padding: 16px; white-space: pre-wrap; font-size: 13px; line-height: 1.7; max-height: 400px; overflow-y: auto; }
+
+.bar-chart { margin-top: 12px; }
+.bar-row { display: flex; align-items: center; margin-bottom: 8px; gap: 8px; }
+.bar-label { width: 110px; font-size: 12px; font-weight: 600; color: var(--gray-600); text-align: right; flex-shrink: 0; }
+.bar-track { flex: 1; height: 20px; background: var(--gray-100); border-radius: 4px; overflow: hidden; position: relative; }
+.bar-fill { height: 100%; border-radius: 4px; transition: width .3s; display: flex; align-items: center; padding-left: 6px; font-size: 10px; font-weight: 700; color: #fff; min-width: 24px; }
+.bar-value { width: 36px; font-size: 12px; font-weight: 600; color: var(--gray-700); flex-shrink: 0; }
+
+.search-bar { position: relative; }
+.search-bar input { padding-left: 36px; }
+.search-bar .search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 14px; color: var(--gray-400); pointer-events: none; }
+
+.toast {
+  position: fixed; bottom: 24px; right: 24px; background: var(--gray-800);
+  color: #fff; padding: 12px 20px; border-radius: 8px; font-size: 13px;
+  z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,.2);
+  animation: slideIn .3s ease;
+}
+@keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+@media(max-width:900px){
+  .kanban { grid-template-columns: 1fr 1fr; }
+}
+@media(max-width:768px){
+  .menu-toggle { display: flex; }
+  #sidebar { transform: translateX(-100%); }
+  #sidebar.open { transform: translateX(0); }
+  #main { margin-left: 0; }
+  .kanban { grid-template-columns: 1fr; }
+  .form-row { grid-template-columns: 1fr; }
+  .stat-grid { grid-template-columns: 1fr 1fr; }
+}
+@media(max-width:480px){
+  .stat-grid { grid-template-columns: 1fr; }
+}
+.hidden { display: none !important; }
+.text-muted { color: var(--gray-500); }
+.text-sm { font-size: 12px; }
+.mt-8 { margin-top: 8px; }
+.mt-16 { margin-top: 16px; }
+.mb-16 { margin-bottom: 16px; }
+
+/* Chatbot */
+#chatbot-toggle {
+  position: fixed; bottom: 24px; right: 24px; z-index: 400;
+  width: 52px; height: 52px; border-radius: 50%;
+  background: var(--blue); color: #fff; border: none;
+  font-size: 24px; display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 16px rgba(26,86,219,.4); cursor: pointer;
+  transition: transform .15s, box-shadow .15s;
+}
+#chatbot-toggle:hover { transform: scale(1.08); box-shadow: 0 6px 20px rgba(26,86,219,.5); }
+#chatbot-panel {
+  position: fixed; bottom: 88px; right: 24px; z-index: 400;
+  width: 380px; max-height: 520px; background: #fff;
+  border-radius: 16px; border: 1px solid var(--gray-200);
+  box-shadow: 0 12px 40px rgba(0,0,0,.15);
+  display: flex; flex-direction: column;
+  transition: opacity .2s, transform .2s;
+}
+#chatbot-panel.hidden { opacity: 0; transform: translateY(12px); pointer-events: none; display: flex !important; }
+#chatbot-panel .chat-header {
+  padding: 14px 18px; border-bottom: 1px solid var(--gray-200);
+  display: flex; align-items: center; justify-content: space-between;
+  border-radius: 16px 16px 0 0; background: var(--gray-50);
+}
+#chatbot-panel .chat-header h3 { font-size: 14px; font-weight: 700; color: var(--gray-800); }
+#chatbot-panel .chat-header .chat-close { background: none; border: none; font-size: 18px; color: var(--gray-400); cursor: pointer; padding: 2px; }
+#chat-messages {
+  flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px;
+  min-height: 200px; max-height: 360px;
+}
+.chat-msg {
+  max-width: 88%; padding: 10px 14px; border-radius: 14px;
+  font-size: 13px; line-height: 1.5; word-wrap: break-word;
+}
+.chat-msg.bot { background: var(--gray-100); color: var(--gray-800); align-self: flex-start; border-bottom-left-radius: 4px; }
+.chat-msg.user { background: var(--blue); color: #fff; align-self: flex-end; border-bottom-right-radius: 4px; }
+.chat-msg a { color: inherit; text-decoration: underline; cursor: pointer; }
+.chat-msg .chat-action { display: inline-block; margin-top: 6px; padding: 3px 10px; background: rgba(0,0,0,.08); border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer; }
+.chat-msg .chat-action:hover { background: rgba(0,0,0,.15); }
+#chat-input-area {
+  padding: 12px 14px; border-top: 1px solid var(--gray-200);
+  display: flex; gap: 8px; align-items: center;
+}
+#chat-input-area input {
+  flex: 1; border: 1px solid var(--gray-200); border-radius: 20px;
+  padding: 8px 14px; font-size: 13px; outline: none;
+}
+#chat-input-area input:focus { border-color: var(--blue); }
+#chat-input-area button {
+  width: 34px; height: 34px; border-radius: 50%; background: var(--blue);
+  color: #fff; border: none; font-size: 16px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.chat-suggestions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.chat-suggestions span {
+  padding: 3px 8px; background: var(--blue-light); color: var(--blue);
+  border-radius: 10px; font-size: 11px; font-weight: 600; cursor: pointer;
+}
+.chat-suggestions span:hover { background: var(--blue); color: #fff; }
+
+/* Custom weight row */
+.weight-row {
+  display: flex; align-items: center; gap: 10px; padding: 10px 0;
+  border-bottom: 1px solid var(--gray-100);
+}
+.weight-row .wr-name { flex: 1; font-weight: 600; font-size: 13px; color: var(--gray-700); }
+.weight-row .wr-val { width: 36px; text-align: center; font-weight: 700; font-size: 13px; color: var(--blue); }
+.weight-row input[type="range"] { width: 160px; padding: 0; border: none; height: 6px; -webkit-appearance: none; appearance: none; background: var(--gray-200); border-radius: 3px; outline: none; }
+.weight-row input[type="range"]:focus { box-shadow: none; }
+.weight-row input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: var(--blue); cursor: pointer; }
+.weight-row input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: var(--blue); cursor: pointer; border: none; }
+.weight-row .wr-delete { background: none; border: none; color: var(--gray-400); font-size: 16px; cursor: pointer; padding: 2px 4px; }
+.weight-row .wr-delete:hover { color: var(--red); }
+.weight-row .wr-badge { font-size: 10px; padding: 1px 6px; border-radius: 4px; background: var(--indigo-light); color: var(--indigo); font-weight: 600; }
+
+@media(max-width:480px){
+  #chatbot-panel { width: calc(100vw - 32px); right: 16px; bottom: 80px; }
+}
+
+/* Theme swatches */
+.theme-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+.theme-swatch {
+  border: 2px solid var(--gray-200); border-radius: 10px; padding: 12px; cursor: pointer;
+  transition: all .15s; text-align: center;
+}
+.theme-swatch:hover { border-color: var(--gray-400); transform: translateY(-2px); }
+.theme-swatch.active { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(26,86,219,.15); }
+.theme-swatch .swatch-colors { display: flex; gap: 3px; margin-bottom: 8px; border-radius: 6px; overflow: hidden; height: 32px; }
+.theme-swatch .swatch-colors div { flex: 1; }
+.theme-swatch .swatch-name { font-size: 12px; font-weight: 600; color: var(--gray-700); }
+
+/* Settings sections */
+.setting-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 0; border-bottom: 1px solid var(--gray-100);
+}
+.setting-row:last-child { border-bottom: none; }
+.setting-row .sr-label { font-weight: 600; font-size: 13px; color: var(--gray-700); }
+.setting-row .sr-desc { font-size: 12px; color: var(--gray-500); margin-top: 2px; }
+.setting-row select, .setting-row input { width: auto; min-width: 160px; }
+.toggle-switch {
+  position: relative; width: 44px; height: 24px; background: var(--gray-300);
+  border-radius: 12px; cursor: pointer; transition: background .2s; flex-shrink: 0;
+}
+.toggle-switch.on { background: var(--blue); }
+.toggle-switch::after {
+  content: ''; position: absolute; top: 2px; left: 2px;
+  width: 20px; height: 20px; border-radius: 50%; background: #fff;
+  transition: transform .2s; box-shadow: 0 1px 3px rgba(0,0,0,.2);
+}
+.toggle-switch.on::after { transform: translateX(20px); }
+
+/* Talking point pill */
+.tp-tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 10px; background: var(--green-light); color: var(--green);
+  border-radius: 16px; font-size: 12px; font-weight: 600; margin: 2px;
+}
+.tp-tag .tp-x { cursor: pointer; font-size: 14px; margin-left: 2px; opacity: .7; }
+.tp-tag .tp-x:hover { opacity: 1; }
+</style>
+</head>
+<body>
+<button class="menu-toggle" onclick="document.getElementById('sidebar').classList.toggle('open')">&#9776;</button>
+
+<aside id="sidebar">
+  <div class="logo">&#9670; <span>ProspectPro</span></div>
+  <nav id="nav">
+    <a href="#" data-page="dashboard" class="active"><span class="nav-icon">&#128202;</span> Dashboard</a>
+    <a href="#" data-page="prospects"><span class="nav-icon">&#128101;</span> Prospects</a>
+    <a href="#" data-page="pipeline"><span class="nav-icon">&#128640;</span> Pipeline</a>
+    <a href="#" data-page="top"><span class="nav-icon">&#127942;</span> Top Prospects</a>
+    <a href="#" data-page="outreach"><span class="nav-icon">&#9993;</span> Outreach</a>
+    <a href="#" data-page="settings"><span class="nav-icon">&#9878;</span> Scoring Weights</a>
+    <a href="#" data-page="appsettings"><span class="nav-icon">&#9881;</span> Settings</a>
+  </nav>
+  <div class="security-badge">
+    <strong>&#128274; Zero Data Storage</strong>
+    All data exists in memory only. Nothing is saved to disk or sent to any server. Close the tab and it's gone.
+  </div>
+</aside>
+
+<div id="main">
+  <header id="header">
+    <h1 id="page-title">Dashboard</h1>
+    <div class="header-actions">
+      <button class="btn-outline btn-sm" onclick="showImportModal()">&#128228; Import</button>
+      <button class="btn-outline btn-sm" onclick="showAddProspectModal()">&#10133; Add</button>
+      <button class="btn-primary btn-sm" onclick="exportFullReport()">&#128229; Export Report</button>
+    </div>
+  </header>
+  <div id="content"></div>
+</div>
+
+<div id="modal-root"></div>
+<div id="toast-root"></div>
+
+<button id="chatbot-toggle" title="Ask ProspectPro AI">&#128172;</button>
+<div id="chatbot-panel" class="hidden">
+  <div class="chat-header">
+    <h3>&#9670; ProspectPro Assistant</h3>
+    <button class="chat-close" onclick="toggleChat()">&#10005;</button>
+  </div>
+  <div id="chat-messages"></div>
+  <div id="chat-input-area">
+    <input type="text" id="chat-input" placeholder="Ask me anything..." />
+    <button onclick="sendChat()">&#10148;</button>
+  </div>
+</div>
+
+<script>
+(function() {
+"use strict";
+
+// ===== STATE =====
+var prospects = [];
+var nextId = 1;
+var currentPage = 'dashboard';
+var sortCol = 'score';
+var sortDir = -1;
+var searchTerm = '';
+
+// Each factor uses a 1–25 scale. No fixed budget — weights are relative.
+var weights = { homeValue: 18, salary: 13, pledge: 18, lifetime: 18, recency: 13, engagement: 10 };
+var defaultWeights = { homeValue: 18, salary: 13, pledge: 18, lifetime: 18, recency: 13, engagement: 10 };
+
+// Custom weights: user-defined numeric factors from Excel columns
+var customWeights = [];
+
+// Fundraiser Profile — used to personalize all outreach
+var profile = {
+  name: '', title: '', orgName: '', orgMission: '',
+  phone: '', email: '', signature: '',
+  upcomingEvent: '', eventDate: '',
+  newsletterUpdate: '',
+  talkingPoints: [],
+  tone: 'warm-professional',
+  campaignName: ''
+};
+
+// Theme & App Settings
+var THEMES = [
+  { id: 'default', name: 'Ocean Blue', primary: '#1a56db', dark: '#1e40af', sidebar: '#111827', accent: '#059669' },
+  { id: 'forest', name: 'Forest Green', primary: '#059669', dark: '#047857', sidebar: '#064e3b', accent: '#0d9488' },
+  { id: 'crimson', name: 'University Red', primary: '#dc2626', dark: '#b91c1c', sidebar: '#1c1917', accent: '#ea580c' },
+  { id: 'purple', name: 'Foundation Purple', primary: '#7c3aed', dark: '#6d28d9', sidebar: '#1e1b4b', accent: '#a855f7' },
+  { id: 'gold', name: 'Nonprofit Gold', primary: '#b45309', dark: '#92400e', sidebar: '#1c1917', accent: '#d97706' },
+  { id: 'teal', name: 'Health & Wellness', primary: '#0d9488', dark: '#0f766e', sidebar: '#134e4a', accent: '#06b6d4' },
+  { id: 'slate', name: 'Corporate Gray', primary: '#475569', dark: '#334155', sidebar: '#0f172a', accent: '#6366f1' },
+  { id: 'rose', name: 'Arts & Culture', primary: '#e11d48', dark: '#be123c', sidebar: '#1a1a2e', accent: '#f43f5e' }
+];
+var currentTheme = 'default';
+var appSettings = {
+  defaultStage: 'Prospect',
+  showScoreOnCards: true,
+  compactTables: false,
+  alertThresholdCritical: 180,
+  alertThresholdWarning: 90
+};
+
+function applyTheme(themeId) {
+  var theme = THEMES.find(function(t) { return t.id === themeId; }) || THEMES[0];
+  currentTheme = theme.id;
+  var root = document.documentElement;
+  root.style.setProperty('--blue', theme.primary);
+  root.style.setProperty('--blue-dark', theme.dark);
+  root.style.setProperty('--gray-900', theme.sidebar);
+  var r = parseInt(theme.primary.slice(1,3),16), g = parseInt(theme.primary.slice(3,5),16), b = parseInt(theme.primary.slice(5,7),16);
+  root.style.setProperty('--blue-light', 'rgba('+r+','+g+','+b+',0.08)');
+  document.getElementById('sidebar').style.background = theme.sidebar;
+}
+
+var STAGES = ['Prospect', 'Cultivate', 'Solicit', 'Steward'];
+var STAGE_CLASSES = { Prospect: 'stage-prospect', Cultivate: 'stage-cultivate', Solicit: 'stage-solicit', Steward: 'stage-steward' };
+
+var salaryLookup = {
+  'ceo': 250000, 'chief executive': 250000, 'president': 200000,
+  'physician': 300000, 'surgeon': 300000, 'doctor': 300000, 'md': 300000,
+  'attorney': 160000, 'lawyer': 160000, 'partner': 200000,
+  'vp': 180000, 'vice president': 180000,
+  'director': 150000, 'senior director': 170000,
+  'engineer': 120000, 'software engineer': 130000, 'developer': 120000,
+  'professor': 100000, 'teacher': 65000,
+  'consultant': 110000, 'analyst': 80000, 'manager': 95000,
+  'nurse': 75000, 'pharmacist': 120000, 'dentist': 180000,
+  'architect': 100000, 'accountant': 80000, 'cpa': 90000,
+  'realtor': 85000, 'real estate': 85000,
+  'retired': 60000, 'student': 30000, 'nonprofit': 65000,
+  'executive': 200000, 'founder': 200000, 'entrepreneur': 150000,
+  'cfo': 220000, 'cto': 220000, 'coo': 210000,
+  'investment banker': 250000, 'banker': 130000, 'finance': 120000,
+  'pilot': 130000, 'sales': 90000
+};
+
+// ===== HELPERS =====
+function $(sel, root) { return (root || document).querySelector(sel); }
+function $$(sel, root) { return Array.from((root || document).querySelectorAll(sel)); }
+
+function h(tag, attrs, children) {
+  var e = document.createElement(tag);
+  if (attrs) {
+    Object.keys(attrs).forEach(function(k) {
+      if (k === 'className') e.className = attrs[k];
+      else if (k === 'style' && typeof attrs[k] === 'object') Object.assign(e.style, attrs[k]);
+      else if (k.startsWith('on') && typeof attrs[k] === 'function') {
+        e.addEventListener(k.slice(2).toLowerCase(), attrs[k]);
+      }
+      else if (k === 'htmlFor') e.setAttribute('for', attrs[k]);
+      else e.setAttribute(k, attrs[k]);
+    });
+  }
+  if (children !== undefined && children !== null) {
+    if (!Array.isArray(children)) children = [children];
+    children.forEach(function(c) {
+      if (c == null || c === false) return;
+      if (typeof c === 'string' || typeof c === 'number') e.appendChild(document.createTextNode(String(c)));
+      else e.appendChild(c);
+    });
+  }
+  return e;
+}
+
+function fmt$(v) {
+  if (v == null || isNaN(v) || v === 0) return '$0';
+  return '$' + Math.round(Number(v)).toLocaleString('en-US');
+}
+function fmtDate(d) {
+  if (!d) return '\u2014';
+  var dt = (d instanceof Date) ? d : new Date(d);
+  if (isNaN(dt.getTime())) return '\u2014';
+  var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return months[dt.getMonth()] + ' ' + dt.getDate() + ', ' + dt.getFullYear();
+}
+function daysSince(d) {
+  if (!d) return 999;
+  var dt = (d instanceof Date) ? d : new Date(d);
+  if (isNaN(dt.getTime())) return 999;
+  return Math.floor((Date.now() - dt.getTime()) / 86400000);
+}
+function estimateSalary(occ) {
+  if (!occ) return 75000;
+  var lower = occ.toLowerCase();
+  var keys = Object.keys(salaryLookup);
+  for (var i = 0; i < keys.length; i++) {
+    if (lower.indexOf(keys[i]) !== -1) return salaryLookup[keys[i]];
+  }
+  return 75000;
+}
+function scoreClass(s) { return s >= 70 ? 'score-high' : s >= 40 ? 'score-mid' : 'score-low'; }
+function stageClass(st) { return STAGE_CLASSES[st] || 'stage-prospect'; }
+
+function toast(msg) {
+  var t = h('div', { className: 'toast' }, [msg]);
+  $('#toast-root').appendChild(t);
+  setTimeout(function() { if (t.parentNode) t.remove(); }, 3000);
+}
+
+// ===== WEIGHT HELPERS =====
+function getTotalWeight() {
+  var sum = 0;
+  Object.keys(weights).forEach(function(k) { sum += weights[k]; });
+  customWeights.forEach(function(cw) { sum += cw.weight; });
+  return sum;
+}
+
+// ===== SCORING =====
+function scoreProspect(p) {
+  var f = {};
+  f.homeValue = Math.min(100, ((p.homeValue || 0) / 2000000) * 100);
+  f.salary = Math.min(100, ((p.salary || 0) / 300000) * 100);
+  f.pledge = Math.min(100, ((p.pledge || 0) / 100000) * 100);
+  f.lifetime = Math.min(100, ((p.lifetime || 0) / 500000) * 100);
+  var ds = daysSince(p.lastContact);
+  f.recency = Math.max(0, 100 - (ds / 365 * 100));
+  var engMap = { high: 100, medium: 60, low: 30, unknown: 20 };
+  f.engagement = engMap[(p.engagement || 'unknown').toLowerCase()] || 20;
+
+  var tw = 0;
+  Object.keys(weights).forEach(function(k) { tw += weights[k]; });
+  var weightedSum = f.homeValue * weights.homeValue + f.salary * weights.salary + f.pledge * weights.pledge +
+    f.lifetime * weights.lifetime + f.recency * weights.recency + f.engagement * weights.engagement;
+
+  // Include custom weights
+  customWeights.forEach(function(cw) {
+    var rawVal = p.customData && p.customData[cw.key] != null ? p.customData[cw.key] : 0;
+    var normalized = cw.maxVal > 0 ? Math.min(100, (rawVal / cw.maxVal) * 100) : 0;
+    f[cw.key] = normalized;
+    weightedSum += normalized * cw.weight;
+    tw += cw.weight;
+  });
+
+  if (tw === 0) tw = 1;
+  p.score = Math.round(weightedSum / tw);
+  p.factors = f;
+  return p.score;
+}
+function rescoreAll() { prospects.forEach(scoreProspect); }
+
+// ===== PROFILE HELPERS =====
+function pName() { return profile.name || 'Your Name'; }
+function pTitle() { return profile.title || 'Development Officer'; }
+function pOrg() { return profile.orgName || 'Our Organization'; }
+function pMission() { return profile.orgMission || 'our mission'; }
+function pPhone() { return profile.phone || '(555) 000-0000'; }
+function pEmail() { return profile.email || 'your.email@org.com'; }
+function pSig() { return profile.signature || pName() + '\n' + pTitle() + '\n' + pPhone() + ' | ' + pEmail(); }
+function pEvent() { return profile.upcomingEvent; }
+function pEventDate() { return profile.eventDate; }
+function pNewsletter() { return profile.newsletterUpdate; }
+function pTone() { return profile.tone || 'warm-professional'; }
+function pCampaign() { return profile.campaignName; }
+function pTalkingPt() {
+  if (profile.talkingPoints.length === 0) return '';
+  return profile.talkingPoints[Math.floor(Math.random() * profile.talkingPoints.length)];
+}
+
+// Tone modifiers
+function toneGreet(fn) {
+  if (pTone() === 'formal') return 'Dear ' + fn + ',';
+  if (pTone() === 'casual') return 'Hi ' + fn + '!';
+  return 'Dear ' + fn + ',';
+}
+function toneClose() {
+  if (pTone() === 'formal') return 'Respectfully,';
+  if (pTone() === 'casual') return 'Best,';
+  return 'Warm regards,';
+}
+function tonePhoneOpen(fn) {
+  if (pTone() === 'formal') return '"Good morning/afternoon, ' + fn + '. This is ' + pName() + ' with ' + pOrg() + '. I hope I\'m not interrupting. Do you have a moment?"';
+  if (pTone() === 'casual') return '"Hey ' + fn + '! It\'s ' + pName() + ' from ' + pOrg() + '. How are you? Got a few minutes?"';
+  return '"Hi ' + fn + ', this is ' + pName() + ' from ' + pOrg() + '. I hope I\'m not catching you at a bad time. Do you have a few minutes?"';
+}
+
+// ===== RECOMMENDATIONS & ALERTS =====
+function getRecommendation(p) {
+  var ds = daysSince(p.lastContact);
+  if (p.stage === 'Prospect') return 'Schedule introduction meeting';
+  if (p.stage === 'Cultivate' && ds > 60) return 'OVERDUE \u2014 Re-engage now';
+  if (p.stage === 'Cultivate') return 'Continue relationship building';
+  if (p.stage === 'Solicit') return 'Prepare and schedule the ask';
+  if (p.stage === 'Steward' && ds > 90) return 'Send impact update';
+  if (p.stage === 'Steward') return 'Maintain stewardship cadence';
+  return 'Review prospect status';
+}
+
+function getAlerts() {
+  var alerts = [];
+  var critDays = appSettings.alertThresholdCritical;
+  var warnDays = appSettings.alertThresholdWarning;
+  prospects.forEach(function(p) {
+    var ds = daysSince(p.lastContact);
+    if (ds >= critDays) alerts.push({ type: 'critical', prospect: p, msg: 'No contact in ' + ds + ' days' });
+    else if (ds >= warnDays) alerts.push({ type: 'warning', prospect: p, msg: 'No contact in ' + ds + ' days' });
+    if (p.stage === 'Cultivate' && ds >= 60 && ds < warnDays) alerts.push({ type: 'info', prospect: p, msg: 'Ready to advance? ' + ds + ' days since contact' });
+    if (p.stage === 'Steward' && ds >= 120 && ds < critDays) alerts.push({ type: 'warning', prospect: p, msg: 'Stewardship overdue \u2014 ' + ds + ' days' });
+  });
+  alerts.sort(function(a, b) {
+    var order = { critical: 0, warning: 1, info: 2 };
+    return (order[a.type] || 3) - (order[b.type] || 3);
+  });
+  return alerts;
+}
+
+function getCriticalCount() {
+  return prospects.filter(function(p) { return daysSince(p.lastContact) >= appSettings.alertThresholdCritical; }).length;
+}
+
+// ===== OUTREACH TEMPLATES (PERSONALIZED) =====
+function generateOutreach(p, channel) {
+  var ds = daysSince(p.lastContact);
+  var dsText = ds < 999 ? ds + ' days ago' : 'unknown';
+  var fn = p.firstName || 'there';
+  var ln = p.lastName || '';
+  var fullName = (fn + ' ' + ln).trim();
+  var occ = p.occupation || 'professional';
+  var pledge = fmt$(p.pledge);
+  var lt = fmt$(p.lifetime);
+  var stage = p.stage || 'Prospect';
+
+  var eventMention = pEvent() ? '\n\nWe are hosting ' + pEvent() + (pEventDate() ? ' on ' + pEventDate() : ' soon') + ', and I would love for you to attend.' : '';
+  var campaignMention = pCampaign() ? pCampaign() : 'our current initiative';
+  var impactStory = pTalkingPt() ? pTalkingPt() : 'the incredible impact we are making in our community';
+  var newsletterMention = pNewsletter() ? '\n\nQuick update: ' + pNewsletter() : '';
+
+  var T = {
+    Email: {
+      Prospect: 'Subject: Introduction \u2014 ' + pOrg() + '\n\n' + toneGreet(fn) + '\n\nI hope this message finds you well. My name is ' + pName() + ' and I serve as ' + pTitle() + ' at ' + pOrg() + '. I came across your work as a ' + occ + ' and was truly impressed.\n\nI would love the opportunity to introduce you to ' + impactStory + '. We believe your expertise and passion could be a wonderful complement to our community of supporters.\n\nWould you be available for a brief coffee meeting or phone call in the coming weeks? I would love to learn more about what causes are close to your heart.' + eventMention + newsletterMention + '\n\n' + toneClose() + '\n' + pSig(),
+
+      Cultivate: 'Subject: Exciting Update from ' + pOrg() + '\n\n' + toneGreet(fn) + '\n\nIt has been ' + dsText + ' since we last connected, and I wanted to share some exciting developments with you.\n\n' + impactStory + (p.lifetime > 0 ? ' Your generous lifetime support of ' + lt + ' has been part of making this possible.' : '') + '\n\nAs a valued member of our community, I would love to invite you to ' + (pEvent() ? pEvent() + (pEventDate() ? ' on ' + pEventDate() : '') : 'an upcoming event') + '. It would be a wonderful chance to see our impact firsthand.' + newsletterMention + '\n\nLooking forward to reconnecting.\n\n' + toneClose() + '\n' + pSig(),
+
+      Solicit: 'Subject: A Transformative Opportunity \u2014 ' + campaignMention + '\n\n' + toneGreet(fn) + '\n\nOver the course of our relationship, I have been so grateful for your engagement with ' + pOrg() + (p.lifetime > 0 ? ' and your generous support totaling ' + lt : '') + '. Your belief in ' + pMission() + ' has been truly inspiring.\n\nToday, I am reaching out with an opportunity to make a transformative impact. ' + campaignMention + ' will directly advance ' + pMission() + '. ' + impactStory + '\n\nI would like to discuss a gift of ' + pledge + ' that would create measurable, lasting change. This level of investment would provide meaningful recognition and impact.\n\nCould we schedule a time to meet in person? I would love to share more details.' + eventMention + '\n\nWith gratitude,\n' + pSig(),
+
+      Steward: 'Subject: Your Impact \u2014 A Personal Thank You\n\n' + toneGreet(fn) + '\n\nI wanted to take a moment to express our deepest gratitude for your ' + (p.lifetime > 0 ? 'generous lifetime giving of ' + lt : 'incredible support') + '. Donors like you are the reason ' + pOrg() + ' can advance ' + pMission() + '.\n\nHere is what your generosity has accomplished:\n\u2022 ' + impactStory + '\n\u2022 Continued support of programs that change lives\n\u2022 Strengthened our mission for the future' + eventMention + newsletterMention + '\n\nAlso, many of our strongest partnerships have grown through personal referrals. If you know anyone who might share your passion, I would welcome an introduction.\n\nWith heartfelt thanks,\n' + pSig()
+    },
+    Phone: {
+      Prospect: '=== PHONE SCRIPT: INTRODUCTION CALL ===\nProspect: ' + fullName + ' (' + occ + ')\nCaller: ' + pName() + ', ' + pTitle() + ' at ' + pOrg() + '\n\nOPENING:\n' + tonePhoneOpen(fn) + '\n\nKEY TALKING POINTS:\n\u2022 Brief overview of ' + pOrg() + ' and ' + pMission() + '\n\u2022 Why their background as a ' + occ + ' connects to our work\n\u2022 ' + impactStory + '\n\u2022 Express interest in learning about their philanthropic interests' + (pEvent() ? '\n\u2022 Mention upcoming event: ' + pEvent() + (pEventDate() ? ' on ' + pEventDate() : '') : '') + '\n\nTHE ASK:\n"I would love to schedule a coffee meeting or visit so I can share more about our work at ' + pOrg() + '. Would [suggest two specific times] work for your schedule?"\n\nHANDLING RESPONSES:\n\u2022 YES: "Wonderful! I\'ll send a calendar invite right away. Looking forward to it."\n\u2022 MAYBE: "I completely understand. How about I send you some information via email, and we can find a time that works better?"\n\u2022 NO: "I respect that. Would it be okay if I sent you our latest impact report? No pressure at all."',
+
+      Cultivate: '=== PHONE SCRIPT: RELATIONSHIP BUILDING ===\nProspect: ' + fullName + ' (' + occ + ')\nCaller: ' + pName() + ', ' + pTitle() + ' at ' + pOrg() + '\nLast Contact: ' + dsText + '\n\nOPENING:\n' + tonePhoneOpen(fn) + ' "It has been ' + dsText + ' since we spoke, and I have some exciting news to share."\n\nKEY TALKING POINTS:\n\u2022 Reference previous conversation or meeting\n\u2022 ' + impactStory + '\n\u2022 Connect achievement to their stated interests\n' + (p.lifetime > 0 ? '\u2022 Acknowledge their support of ' + lt + '\n' : '') + (pEvent() ? '\u2022 Invite to: ' + pEvent() + (pEventDate() ? ' on ' + pEventDate() : '') + '\n' : '\u2022 Invite to upcoming event or campus visit\n') + (pNewsletter() ? '\u2022 Share update: ' + pNewsletter() + '\n' : '') + '\nTHE ASK:\n"' + (pEvent() ? 'We\'re hosting ' + pEvent() + ' and I immediately thought of you. Would you be interested in joining us?' : 'I\'d love to have you visit and see our impact firsthand. Would a tour or lunch work for you?') + '"\n\nHANDLING RESPONSES:\n\u2022 YES: "That\'s terrific! I\'ll have an invitation sent to you today. Is there anyone else you\'d like to bring along?"\n\u2022 MAYBE: "No problem at all. Let me send you the details and you can decide closer to the date."\n\u2022 NO: "I understand schedules can be tight. Would a one-on-one lunch work better?"',
+
+      Solicit: '=== PHONE SCRIPT: THE ASK ===\nProspect: ' + fullName + ' (' + occ + ')\nCaller: ' + pName() + ', ' + pTitle() + ' at ' + pOrg() + '\nTarget Gift: ' + pledge + '\nLifetime Giving: ' + lt + '\n\nOPENING:\n' + tonePhoneOpen(fn) + ' "Thank you so much for taking my call. I\'ve been looking forward to speaking with you about something truly exciting."\n\nKEY TALKING POINTS:\n\u2022 Thank them for their ongoing engagement with ' + pOrg() + '\n\u2022 Share ' + campaignMention + ' and its goals\n\u2022 ' + impactStory + '\n\u2022 Connect the initiative to their personal interests\n\nTHE ASK:\n"' + fn + ', we believe a gift of ' + pledge + ' toward ' + campaignMention + ' would create transformative change. At this level, your impact would be significant and recognized. Would you be willing to consider this partnership?"\n\nHANDLING RESPONSES:\n\u2022 YES: "Thank you so much, ' + fn + '! Your generosity will change lives. Let me walk you through the next steps."\n\u2022 MAYBE: "I completely understand this is a significant decision. Could we meet in person so I can share more details?"\n\u2022 NO/LOWER: "I appreciate your honesty. Every gift matters enormously. Would a different amount feel more comfortable? We can also discuss a multi-year pledge."',
+
+      Steward: '=== PHONE SCRIPT: STEWARDSHIP CALL ===\nProspect: ' + fullName + ' (' + occ + ')\nCaller: ' + pName() + ', ' + pTitle() + ' at ' + pOrg() + '\nLifetime Giving: ' + lt + '\nLast Contact: ' + dsText + '\n\nOPENING:\n' + tonePhoneOpen(fn) + ' "I\'m calling with no ask today \u2014 just wanted to share how your generosity is making a difference and say thank you."\n\nKEY TALKING POINTS:\n\u2022 ' + impactStory + '\n\u2022 Share a personal story from a beneficiary\n' + (pEvent() ? '\u2022 Invite to: ' + pEvent() + (pEventDate() ? ' on ' + pEventDate() : '') + '\n' : '\u2022 Mention upcoming recognition event\n') + '\u2022 Invite them to share ' + pMission() + ' with friends or colleagues' + (pNewsletter() ? '\n\u2022 Update: ' + pNewsletter() : '') + '\n\nTHE ASK:\n"' + (pEvent() ? 'We would be honored if you could join us at ' + pEvent() + '. ' : '') + 'Also, is there anyone in your network who might be interested in learning about our work?"\n\nHANDLING RESPONSES:\n\u2022 YES to referral: "Wonderful! I would love an introduction. I promise to treat them with the same respect and care."\n\u2022 MAYBE: "No pressure at all. If anyone ever comes to mind, we would welcome the connection."\n\u2022 NO: "Completely understood. We\'re just so grateful for your continued partnership."'
+    },
+    LinkedIn: {
+      Prospect: 'Hi ' + fn + ',\n\nI came across your profile and was impressed by your work as a ' + occ + '. I\'m ' + pName() + ' with ' + pOrg() + ', and I think you\'d find ' + pMission() + ' quite compelling.\n\n' + impactStory + '\n\nWould you be open to a brief conversation?' + (pEvent() ? '\n\nWe also have ' + pEvent() + ' coming up \u2014 would love to have you!' : '') + '\n\nBest,\n' + pName(),
+
+      Cultivate: 'Hi ' + fn + ',\n\nGreat to be connected! I wanted to reach out because we\'ve had some exciting developments at ' + pOrg() + ' since we last spoke ' + dsText + '.\n\n' + impactStory + (pNewsletter() ? '\n\nAlso: ' + pNewsletter() : '') + '\n\nWould you be up for a quick call or coffee to catch up?' + (pEvent() ? ' Or join us at ' + pEvent() + '!' : '') + '\n\n' + pName(),
+
+      Solicit: 'Hi ' + fn + ',\n\nI\'ve truly valued getting to know you and sharing our work at ' + pOrg() + (p.lifetime > 0 ? '. Your support of ' + lt + ' has meant the world to us' : '') + '.\n\nWe\'re at a pivotal moment with ' + campaignMention + ', and I believe a partnership at the ' + pledge + ' level could create transformative change. ' + impactStory + '\n\nCould we find 20 minutes this week to discuss?\n\nWith gratitude,\n' + pName(),
+
+      Steward: 'Hi ' + fn + ',\n\nJust wanted to drop a note of thanks. Your support of ' + pOrg() + ' has directly contributed to incredible impact. ' + impactStory + (pNewsletter() ? '\n\nUpdate: ' + pNewsletter() : '') + '\n\nIf you know anyone who shares your passion for ' + pMission() + ', I\'d welcome an introduction. Our community grows strongest through partners like you.' + (pEvent() ? '\n\nP.S. \u2014 We\'d love to see you at ' + pEvent() + '!' : '') + '\n\nThank you,\n' + pName()
+    }
+  };
+  return (T[channel] && T[channel][stage]) || 'Template not available for this combination.';
+}
+
+// ===== NAVIGATION =====
+function navigate(page) {
+  currentPage = page;
+  $$('#nav a').forEach(function(a) { a.classList.toggle('active', a.dataset.page === page); });
+  var titles = { dashboard:'Dashboard', prospects:'Prospects', pipeline:'Pipeline', top:'Top Prospects', outreach:'Outreach', settings:'Scoring Weights', appsettings:'Settings' };
+  $('#page-title').textContent = titles[page] || page;
+  render();
+  updateAlertBadge();
+}
+
+function updateAlertBadge() {
+  var c = getCriticalCount();
+  var link = $('[data-page="dashboard"]');
+  var existing = link.querySelector('.badge-count');
+  if (existing) existing.remove();
+  if (c > 0) link.appendChild(h('span', { className: 'badge-count' }, ['' + c]));
+}
+
+$$('#nav a').forEach(function(a) {
+  a.addEventListener('click', function(e) {
+    e.preventDefault();
+    navigate(a.dataset.page);
+    $('#sidebar').classList.remove('open');
+  });
+});
+
+// ===== RENDER DISPATCH =====
+function render() {
+  var c = $('#content');
+  c.innerHTML = '';
+  var renderers = { dashboard: renderDashboard, prospects: renderProspects, pipeline: renderPipeline, top: renderTopProspects, outreach: renderOutreach, settings: renderSettings, appsettings: renderAppSettings };
+  (renderers[currentPage] || renderDashboard)(c);
+}
+
+// ===== DASHBOARD =====
+function renderDashboard(ct) {
+  var total = prospects.length;
+  var totalPledged = prospects.reduce(function(s, p) { return s + (p.pledge || 0); }, 0);
+  var totalLifetime = prospects.reduce(function(s, p) { return s + (p.lifetime || 0); }, 0);
+  var avgScore = total > 0 ? Math.round(prospects.reduce(function(s, p) { return s + p.score; }, 0) / total) : 0;
+
+  var stats = h('div', { className: 'stat-grid' });
+  [{l:'Total Prospects',v:''+total,s:'In pipeline'},{l:'Total Pledged',v:fmt$(totalPledged),s:'Across all stages'},{l:'Lifetime Giving',v:fmt$(totalLifetime),s:'All-time contributions'},{l:'Average Score',v:avgScore+'/100',s:'Portfolio quality'}].forEach(function(d) {
+    stats.appendChild(h('div', { className: 'stat-card' }, [
+      h('div', { className: 'stat-label' }, [d.l]),
+      h('div', { className: 'stat-value' }, [d.v]),
+      h('div', { className: 'stat-sub' }, [d.s])
+    ]));
+  });
+  ct.appendChild(stats);
+
+  // Pipeline breakdown
+  var pc = h('div', { className: 'card' });
+  pc.appendChild(h('div', { className: 'card-header' }, [h('h2', {}, ['Pipeline Breakdown'])]));
+  var pg = h('div', { className: 'stat-grid' });
+  STAGES.forEach(function(st) {
+    var sp = prospects.filter(function(p) { return p.stage === st; });
+    pg.appendChild(h('div', { className: 'stat-card' }, [
+      h('div', { className: 'stat-label' }, [h('span', { className: 'stage-badge ' + stageClass(st) }, [st])]),
+      h('div', { className: 'stat-value' }, ['' + sp.length]),
+      h('div', { className: 'stat-sub' }, [fmt$(sp.reduce(function(s, p) { return s + (p.pledge || 0); }, 0)) + ' pledged'])
+    ]));
+  });
+  pc.appendChild(pg);
+  ct.appendChild(pc);
+
+  // Alerts
+  var alerts = getAlerts();
+  if (alerts.length > 0) {
+    var ac = h('div', { className: 'card' });
+    ac.appendChild(h('div', { className: 'card-header' }, [h('h2', {}, ['Action Required']), h('span', { className: 'text-sm text-muted' }, [alerts.length + ' alert' + (alerts.length !== 1 ? 's' : '')])]));
+    alerts.slice(0, 10).forEach(function(a) {
+      var card = h('div', { className: 'alert-card alert-' + a.type, onClick: function() { openProspectDetail(a.prospect.id); } }, [
+        h('span', { className: 'score-badge score-badge-sm ' + scoreClass(a.prospect.score) }, ['' + a.prospect.score]),
+        h('div', { style: { flex: '1' } }, [
+          h('div', { style: { fontWeight: '600' } }, [(a.prospect.firstName + ' ' + a.prospect.lastName).trim()]),
+          h('div', { className: 'text-sm text-muted' }, [a.msg])
+        ]),
+        h('span', { className: 'stage-badge ' + stageClass(a.prospect.stage) }, [a.prospect.stage])
+      ]);
+      ac.appendChild(card);
+    });
+    if (alerts.length > 10) ac.appendChild(h('div', { className: 'text-muted text-sm', style: { textAlign: 'center', padding: '8px' } }, ['+ ' + (alerts.length - 10) + ' more alerts']));
+    ct.appendChild(ac);
+  }
+
+  if (total === 0) {
+    var empty = h('div', { className: 'card', style: { textAlign: 'center', padding: '60px 20px' } }, [
+      h('div', { style: { fontSize: '48px', marginBottom: '12px' } }, ['\uD83D\uDCCA']),
+      h('div', { style: { fontSize: '18px', fontWeight: '600', marginBottom: '8px' } }, ['Welcome to ProspectPro']),
+      h('div', { className: 'text-muted mb-16' }, ['Import a prospect list or add prospects manually to get started.']),
+      h('div', { style: { display: 'flex', gap: '8px', justifyContent: 'center' } }, [
+        h('button', { className: 'btn-primary', onClick: showImportModal }, ['\uD83D\uDCE8 Import Data']),
+        h('button', { className: 'btn-outline', onClick: showAddProspectModal }, ['\u2795 Add Prospect'])
+      ])
+    ]);
+    ct.appendChild(empty);
+  }
+}
+
+// ===== PROSPECTS TABLE =====
+function renderProspects(ct) {
+  var toolbar = h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' } });
+  var sb = h('div', { className: 'search-bar', style: { width: '300px' } });
+  sb.appendChild(h('span', { className: 'search-icon' }, ['\uD83D\uDD0D']));
+  var si = h('input', { type: 'text', placeholder: 'Search prospects...', value: searchTerm });
+  si.addEventListener('input', function() { searchTerm = this.value; render(); });
+  sb.appendChild(si);
+  toolbar.appendChild(sb);
+  toolbar.appendChild(h('div', { style: { display: 'flex', gap: '8px' } }, [
+    h('button', { className: 'btn-outline btn-sm', onClick: showImportModal }, ['\uD83D\uDCE8 Import']),
+    h('button', { className: 'btn-outline btn-sm', onClick: showAddProspectModal }, ['\u2795 Add']),
+    h('button', { className: 'btn-primary btn-sm', onClick: function() { exportProspects(getFilteredProspects()); } }, ['\uD83D\uDCE5 Export'])
+  ]));
+  ct.appendChild(toolbar);
+
+  var filtered = getFilteredProspects();
+  if (filtered.length === 0) {
+    ct.appendChild(h('div', { className: 'card text-muted', style: { textAlign: 'center', padding: '40px' } }, [prospects.length === 0 ? 'No prospects yet. Import or add prospects to begin.' : 'No prospects match your search.']));
+    return;
+  }
+
+  var card = h('div', { className: 'card', style: { overflow: 'auto' } });
+  var table = h('table');
+  var thead = h('thead');
+  var hr = h('tr');
+  var cols = [
+    {k:'score',l:'Score',w:'70px'},{k:'lastName',l:'Name'},{k:'occupation',l:'Occupation'},{k:'stage',l:'Stage'},
+    {k:'pledge',l:'Pledge',a:'right'},{k:'lifetime',l:'Lifetime',a:'right'},{k:'lastContact',l:'Last Contact'},{k:'recommendation',l:'Action'}
+  ];
+  cols.forEach(function(c) {
+    var th = h('th', { style: c.w ? { width: c.w } : {} });
+    th.textContent = c.l + (sortCol === c.k ? (sortDir === 1 ? ' \u25B2' : ' \u25BC') : '');
+    if (c.a) th.style.textAlign = c.a;
+    th.addEventListener('click', function() {
+      if (sortCol === c.k) sortDir *= -1;
+      else { sortCol = c.k; sortDir = (c.k === 'score' || c.k === 'pledge' || c.k === 'lifetime') ? -1 : 1; }
+      render();
+    });
+    hr.appendChild(th);
+  });
+  thead.appendChild(hr);
+  table.appendChild(thead);
+
+  var tbody = h('tbody');
+  filtered.forEach(function(p) {
+    var ds = daysSince(p.lastContact);
+    var rec = getRecommendation(p);
+    var contactEl = h('td');
+    contactEl.appendChild(h('div', {}, [fmtDate(p.lastContact)]));
+    if (ds < 999) contactEl.appendChild(h('div', { className: 'text-sm', style: ds > 90 ? { color: 'var(--red)', fontWeight: '600' } : { color: 'var(--gray-500)' } }, [ds + ' days ago']));
+
+    var tr = h('tr', { style: { cursor: 'pointer' }, onClick: function() { openProspectDetail(p.id); } }, [
+      h('td', {}, [h('span', { className: 'score-badge score-badge-sm ' + scoreClass(p.score) }, ['' + p.score])]),
+      h('td', { style: { fontWeight: '600' } }, [(p.firstName + ' ' + p.lastName).trim()]),
+      h('td', { className: 'text-muted', style: { maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, [p.occupation || '\u2014']),
+      h('td', {}, [h('span', { className: 'stage-badge ' + stageClass(p.stage) }, [p.stage])]),
+      h('td', { style: { textAlign: 'right', fontWeight: '600' } }, [fmt$(p.pledge)]),
+      h('td', { style: { textAlign: 'right' } }, [fmt$(p.lifetime)]),
+      contactEl,
+      h('td', { style: rec.indexOf('OVERDUE') !== -1 ? { color: 'var(--red)', fontWeight: '600', fontSize: '12px' } : { fontSize: '12px', color: 'var(--gray-600)' } }, [rec])
+    ]);
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  card.appendChild(table);
+  ct.appendChild(card);
+  ct.appendChild(h('div', { className: 'text-sm text-muted mt-8' }, ['Showing ' + filtered.length + ' of ' + prospects.length + ' prospects']));
+}
+
+function getFilteredProspects() {
+  var list = prospects.slice();
+  if (searchTerm) {
+    var term = searchTerm.toLowerCase();
+    list = list.filter(function(p) {
+      return (p.firstName + ' ' + p.lastName + ' ' + (p.occupation || '') + ' ' + (p.email || '') + ' ' + (p.stage || '')).toLowerCase().indexOf(term) !== -1;
+    });
+  }
+  list.sort(function(a, b) {
+    var va = a[sortCol], vb = b[sortCol];
+    if (sortCol === 'recommendation') { va = getRecommendation(a); vb = getRecommendation(b); }
+    if (sortCol === 'lastName') { va = (a.firstName + ' ' + a.lastName).toLowerCase(); vb = (b.firstName + ' ' + b.lastName).toLowerCase(); }
+    if (va == null) va = '';
+    if (vb == null) vb = '';
+    if (typeof va === 'string') return va.localeCompare(vb) * sortDir;
+    return ((va || 0) - (vb || 0)) * sortDir;
+  });
+  return list;
+}
+
+// ===== PIPELINE KANBAN =====
+function renderPipeline(ct) {
+  var kanban = h('div', { className: 'kanban' });
+  STAGES.forEach(function(stage) {
+    var sp = prospects.filter(function(p) { return p.stage === stage; }).sort(function(a, b) { return b.score - a.score; });
+    var col = h('div', { className: 'kanban-col' });
+    col.appendChild(h('div', { className: 'kanban-col-header' }, [
+      h('span', { className: 'stage-badge ' + stageClass(stage) }, [stage]),
+      h('span', { className: 'count' }, ['' + sp.length])
+    ]));
+    sp.forEach(function(p) {
+      var idx = STAGES.indexOf(stage);
+      var actions = h('div', { className: 'kc-actions' });
+      if (idx > 0) actions.appendChild(h('button', { className: 'btn-outline btn-sm', onClick: function(e) { e.stopPropagation(); moveStage(p, -1); } }, ['\u25C0 ' + STAGES[idx - 1]]));
+      if (idx < STAGES.length - 1) actions.appendChild(h('button', { className: 'btn-primary btn-sm', onClick: function(e) { e.stopPropagation(); moveStage(p, 1); } }, [STAGES[idx + 1] + ' \u25B6']));
+
+      col.appendChild(h('div', { className: 'kanban-card', onClick: function(e) { if (e.target.tagName !== 'BUTTON') openProspectDetail(p.id); } }, [
+        h('div', { className: 'kc-name' }, [(p.firstName + ' ' + p.lastName).trim()]),
+        h('div', { className: 'kc-occ' }, [p.occupation || '\u2014']),
+        h('div', { className: 'kc-row' }, [
+          h('span', { className: 'kc-pledge' }, [p.pledge ? fmt$(p.pledge) : '']),
+          h('span', { className: 'score-badge score-badge-sm ' + scoreClass(p.score) }, ['' + p.score])
+        ]),
+        actions
+      ]));
+    });
+    if (sp.length === 0) col.appendChild(h('div', { className: 'text-muted text-sm', style: { textAlign: 'center', padding: '24px 0' } }, ['No prospects']));
+    kanban.appendChild(col);
+  });
+  ct.appendChild(kanban);
+}
+
+function moveStage(p, dir) {
+  var idx = STAGES.indexOf(p.stage) + dir;
+  if (idx >= 0 && idx < STAGES.length) {
+    p.stage = STAGES[idx];
+    toast(p.firstName + ' moved to ' + p.stage);
+    render(); updateAlertBadge();
+  }
+}
+
+// ===== TOP PROSPECTS =====
+function renderTopProspects(ct) {
+  var topN = 10;
+  var toolbar = h('div', { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' } });
+  var left = h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } });
+  left.appendChild(h('label', { style: { fontWeight: '600', fontSize: '13px' } }, ['Show top:']));
+  var sel = h('select', { style: { width: '80px' } });
+  [5,10,15,20,40].forEach(function(n) { var o = h('option', { value: ''+n }, [''+n]); if (n === 10) o.selected = true; sel.appendChild(o); });
+  sel.addEventListener('change', function() { topN = parseInt(this.value); rebuildTable(); });
+  left.appendChild(sel);
+  toolbar.appendChild(left);
+  toolbar.appendChild(h('button', { className: 'btn-primary btn-sm', onClick: function() { exportTopN(parseInt(sel.value)); } }, ['\uD83D\uDCE5 Export Top N']));
+  ct.appendChild(toolbar);
+
+  var tableWrap = h('div');
+  function rebuildTable() {
+    tableWrap.innerHTML = '';
+    var sorted = prospects.slice().sort(function(a, b) { return b.score - a.score; }).slice(0, topN);
+    if (sorted.length === 0) { tableWrap.appendChild(h('div', { className: 'card text-muted', style: { textAlign: 'center', padding: '40px' } }, ['No prospects to rank.'])); return; }
+
+    var card = h('div', { className: 'card', style: { overflow: 'auto' } });
+    var tbl = h('table');
+    var thr = h('tr');
+    ['Rank','Score','Name','Occupation','Stage','Pledge','Lifetime','Wealth Signals','Last Contact','Recommendation'].forEach(function(x) { thr.appendChild(h('th', {}, [x])); });
+    tbl.appendChild(h('thead', {}, [thr]));
+    var tb = h('tbody');
+    sorted.forEach(function(p, i) {
+      var ds = daysSince(p.lastContact);
+      var rec = getRecommendation(p);
+      var wealth = h('td');
+      if (p.homeValue) wealth.appendChild(h('div', { className: 'text-sm' }, ['\uD83C\uDFE0 ' + fmt$(p.homeValue)]));
+      if (p.salary) wealth.appendChild(h('div', { className: 'text-sm' }, ['\uD83D\uDCB0 ' + fmt$(p.salary)]));
+      var contact = h('td');
+      contact.appendChild(h('div', { className: 'text-sm' }, [fmtDate(p.lastContact)]));
+      if (ds < 999) contact.appendChild(h('div', { className: 'text-sm text-muted' }, [ds + 'd ago']));
+
+      tb.appendChild(h('tr', { style: { cursor: 'pointer' }, onClick: function() { openProspectDetail(p.id); } }, [
+        h('td', { style: { fontWeight: '700', color: 'var(--gray-400)' } }, ['#' + (i + 1)]),
+        h('td', {}, [h('span', { className: 'score-badge score-badge-sm ' + scoreClass(p.score) }, ['' + p.score])]),
+        h('td', { style: { fontWeight: '600' } }, [(p.firstName + ' ' + p.lastName).trim()]),
+        h('td', { className: 'text-muted' }, [p.occupation || '\u2014']),
+        h('td', {}, [h('span', { className: 'stage-badge ' + stageClass(p.stage) }, [p.stage])]),
+        h('td', { style: { fontWeight: '600' } }, [fmt$(p.pledge)]),
+        h('td', {}, [fmt$(p.lifetime)]),
+        wealth, contact,
+        h('td', { style: rec.indexOf('OVERDUE') !== -1 ? { color: 'var(--red)', fontWeight: '600', fontSize: '12px' } : { fontSize: '12px' } }, [rec])
+      ]));
+    });
+    tbl.appendChild(tb);
+    card.appendChild(tbl);
+    tableWrap.appendChild(card);
+  }
+  rebuildTable();
+  ct.appendChild(tableWrap);
+}
+
+// ===== OUTREACH =====
+function renderOutreach(ct) {
+  if (prospects.length === 0) { ct.appendChild(h('div', { className: 'card text-muted', style: { textAlign: 'center', padding: '40px' } }, ['Add prospects first to generate outreach.'])); return; }
+
+  var selId = prospects[0].id;
+  var selCh = 'Email';
+  var outreachSearch = '';
+  var stageFilter = '';
+
+  // Profile reminder
+  if (!profile.name) {
+    var reminder = h('div', { className: 'card', style: { background: 'var(--amber-light)', border: '1px solid var(--amber)', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' } });
+    reminder.appendChild(h('div', {}, [
+      h('div', { style: { fontWeight: '600', fontSize: '13px', color: 'var(--amber)' } }, ['\u26A0 Personalize your outreach']),
+      h('div', { className: 'text-sm text-muted' }, ['Go to Settings to fill in your profile. Templates will use your name, org, and talking points.'])
+    ]));
+    reminder.appendChild(h('button', { className: 'btn-warning btn-sm', onClick: function() { navigate('appsettings'); } }, ['Go to Settings']));
+    ct.appendChild(reminder);
+  }
+
+  // Search + filter toolbar
+  var toolbar = h('div', { className: 'card', style: { padding: '16px' } });
+  toolbar.appendChild(h('div', { className: 'card-header', style: { marginBottom: '12px' } }, [h('h2', {}, ['Find a Prospect'])]));
+  var searchRow = h('div', { style: { display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' } });
+
+  var sb = h('div', { className: 'search-bar', style: { flex: '1', minWidth: '200px' } });
+  sb.appendChild(h('span', { className: 'search-icon' }, ['\uD83D\uDD0D']));
+  var searchInput = h('input', { type: 'text', placeholder: 'Search by name, occupation, or email...' });
+  searchInput.addEventListener('input', function() { outreachSearch = this.value; rebuildList(); });
+  sb.appendChild(searchInput);
+  searchRow.appendChild(sb);
+
+  var stSel = h('select', { style: { width: '140px' } });
+  stSel.appendChild(h('option', { value: '' }, ['All Stages']));
+  STAGES.forEach(function(st) { stSel.appendChild(h('option', { value: st }, [st])); });
+  stSel.addEventListener('change', function() { stageFilter = this.value; rebuildList(); });
+  searchRow.appendChild(stSel);
+  toolbar.appendChild(searchRow);
+
+  // Results list
+  var resultsList = h('div', { style: { maxHeight: '200px', overflowY: 'auto', marginTop: '12px' } });
+  toolbar.appendChild(resultsList);
+  ct.appendChild(toolbar);
+
+  function rebuildList() {
+    resultsList.innerHTML = '';
+    var filtered = prospects.slice().sort(function(a, b) { return b.score - a.score; });
+    if (outreachSearch) {
+      var q = outreachSearch.toLowerCase();
+      filtered = filtered.filter(function(p) {
+        return (p.firstName + ' ' + p.lastName + ' ' + (p.occupation || '') + ' ' + (p.email || '')).toLowerCase().indexOf(q) !== -1;
+      });
+    }
+    if (stageFilter) filtered = filtered.filter(function(p) { return p.stage === stageFilter; });
+
+    if (filtered.length === 0) {
+      resultsList.appendChild(h('div', { className: 'text-muted text-sm', style: { padding: '12px', textAlign: 'center' } }, ['No matching prospects.']));
+      return;
+    }
+    filtered.slice(0, 50).forEach(function(p) {
+      var row = h('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 4px', cursor: 'pointer', borderBottom: '1px solid var(--gray-100)', borderRadius: '6px' }, onClick: function() {
+        selId = p.id;
+        resultsList.querySelectorAll('div[style]').forEach(function(d) { d.style.background = ''; });
+        row.style.background = 'var(--blue-light)';
+        rebuildContent();
+      } });
+      row.appendChild(h('span', { className: 'score-badge score-badge-sm ' + scoreClass(p.score) }, ['' + p.score]));
+      row.appendChild(h('div', { style: { flex: '1' } }, [
+        h('div', { style: { fontWeight: '600', fontSize: '13px' } }, [(p.firstName + ' ' + p.lastName).trim()]),
+        h('div', { className: 'text-sm text-muted' }, [(p.occupation || 'No occupation') + ' \u2022 ' + p.stage])
+      ]));
+      row.appendChild(h('div', { className: 'text-sm', style: { color: 'var(--gray-500)' } }, [p.email || '']));
+      if (p.id === selId) row.style.background = 'var(--blue-light)';
+      resultsList.appendChild(row);
+    });
+    if (filtered.length > 50) resultsList.appendChild(h('div', { className: 'text-sm text-muted', style: { padding: '8px', textAlign: 'center' } }, ['Showing 50 of ' + filtered.length + ' \u2014 narrow your search']));
+  }
+  rebuildList();
+
+  // Channel tabs
+  var tabs = h('div', { className: 'tabs' });
+  ['Email','Phone','LinkedIn'].forEach(function(ch) {
+    var btn = h('button', { className: 'tab-btn' + (ch === selCh ? ' active' : '') }, [ch]);
+    btn.addEventListener('click', function() {
+      selCh = ch;
+      tabs.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      rebuildContent();
+    });
+    tabs.appendChild(btn);
+  });
+  ct.appendChild(tabs);
+
+  var contentArea = h('div');
+  ct.appendChild(contentArea);
+
+  function rebuildContent() {
+    contentArea.innerHTML = '';
+    var p = prospects.find(function(pr) { return pr.id === selId; });
+    if (!p) { contentArea.appendChild(h('div', { className: 'text-muted', style: { padding: '24px', textAlign: 'center' } }, ['Select a prospect above to generate outreach.'])); return; }
+
+    contentArea.appendChild(h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' } }, [
+      h('span', { className: 'score-badge ' + scoreClass(p.score) }, ['' + p.score]),
+      h('div', {}, [
+        h('div', { style: { fontWeight: '600' } }, [(p.firstName + ' ' + p.lastName).trim()]),
+        h('div', { className: 'text-sm text-muted' }, [(p.occupation || '') + ' \u2022 ' + p.stage + ' \u2022 Last contact: ' + fmtDate(p.lastContact)])
+      ])
+    ]));
+
+    var text = generateOutreach(p, selCh);
+    contentArea.appendChild(h('div', { className: 'outreach-content' }, [text]));
+    contentArea.appendChild(h('div', { style: { display: 'flex', gap: '8px', marginTop: '16px' } }, [
+      h('button', { className: 'btn-primary btn-sm', onClick: function() { copyText(text); } }, ['\uD83D\uDCCB Copy to Clipboard']),
+      h('button', { className: 'btn-outline btn-sm', onClick: function() { exportProspectOutreach(p); } }, ['\uD83D\uDCE5 Export Outreach'])
+    ]));
+  }
+  rebuildContent();
+}
+
+function copyText(text) {
+  if (navigator.clipboard) { navigator.clipboard.writeText(text).then(function() { toast('Copied to clipboard!'); }); }
+  else { var ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); toast('Copied!'); }
+}
+
+// ===== SCORING WEIGHTS (each 1–25) =====
+function renderSettings(ct) {
+  var card = h('div', { className: 'card' });
+  card.appendChild(h('div', { className: 'card-header' }, [
+    h('h2', {}, ['Scoring Factors']),
+    h('div', { style: { display: 'flex', gap: '8px' } }, [
+      h('button', { className: 'btn-outline btn-sm', onClick: function() {
+        customWeights = [];
+        Object.keys(defaultWeights).forEach(function(k) { weights[k] = defaultWeights[k]; });
+        rescoreAll(); render(); toast('Weights reset to default');
+      } }, ['Reset Defaults']),
+      h('button', { className: 'btn-primary btn-sm', onClick: function() { showAddWeightModal(); } }, ['\u2795 Add Factor'])
+    ])
+  ]));
+
+  card.appendChild(h('p', { className: 'text-muted text-sm mb-16' }, ['Each factor is weighted 1\u201325. Higher = more influence on the prospect score. The bar below shows each factor\u2019s share of the total.']));
+
+  // --- Percentage distribution bar ---
+  var segColors = ['#4f46e5','#0891b2','#059669','#d97706','#dc2626','#7c3aed','#db2777','#ea580c','#65a30d','#0284c7'];
+  var allFactors = [
+    {k:'homeValue',l:'Home Value',isCustom:false},
+    {k:'salary',l:'Estimated Salary',isCustom:false},
+    {k:'pledge',l:'Pledge Amount',isCustom:false},
+    {k:'lifetime',l:'Lifetime Giving',isCustom:false},
+    {k:'recency',l:'Contact Recency',isCustom:false},
+    {k:'engagement',l:'Engagement Level',isCustom:false}
+  ];
+  customWeights.forEach(function(cw) {
+    allFactors.push({k:cw.key, l:cw.label, isCustom:true, cw:cw});
+  });
+
+  var pctBarWrap = h('div', { style: { marginBottom: '20px' } });
+  var pctBar = h('div', { style: { display: 'flex', height: '32px', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,.1)' } });
+  var pctLegend = h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '8px 16px', marginTop: '8px', fontSize: '12px' } });
+  pctBarWrap.appendChild(pctBar);
+  pctBarWrap.appendChild(pctLegend);
+  card.appendChild(pctBarWrap);
+
+  function updatePctBar() {
+    var total = getTotalWeight();
+    pctBar.innerHTML = '';
+    pctLegend.innerHTML = '';
+    allFactors.forEach(function(fac, i) {
+      var val = fac.isCustom ? fac.cw.weight : weights[fac.k];
+      var pct = total > 0 ? (val / total * 100) : 0;
+      var col = segColors[i % segColors.length];
+      var seg = document.createElement('div');
+      seg.style.cssText = 'width:' + pct + '%;background:' + col + ';display:flex;align-items:center;justify-content:center;transition:width .25s ease;min-width:0;position:relative;overflow:hidden;';
+      if (pct >= 8) {
+        var segLabel = document.createElement('span');
+        segLabel.style.cssText = 'color:#fff;font-size:11px;font-weight:700;white-space:nowrap;text-shadow:0 1px 2px rgba(0,0,0,.3);';
+        segLabel.textContent = Math.round(pct) + '%';
+        seg.appendChild(segLabel);
+      }
+      seg.title = fac.l + ': ' + val + ' (' + pct.toFixed(1) + '%)';
+      pctBar.appendChild(seg);
+      // Legend dot
+      var dot = document.createElement('span');
+      dot.style.cssText = 'display:inline-flex;align-items:center;gap:4px;';
+      var swatch = document.createElement('span');
+      swatch.style.cssText = 'width:10px;height:10px;border-radius:2px;background:' + col + ';display:inline-block;flex-shrink:0;';
+      dot.appendChild(swatch);
+      dot.appendChild(document.createTextNode(fac.l + ' ' + Math.round(pct) + '%'));
+      pctLegend.appendChild(dot);
+    });
+  }
+  updatePctBar();
+
+  // --- Factor slider rows ---
+  allFactors.forEach(function(fac, fi) {
+    var currentVal = fac.isCustom ? fac.cw.weight : weights[fac.k];
+    var row = h('div', { className: 'weight-row' });
+    var nameEl = h('div', { className: 'wr-name' }, [fac.l]);
+    var col = segColors[fi % segColors.length];
+    var swatch = document.createElement('span');
+    swatch.style.cssText = 'width:10px;height:10px;border-radius:2px;background:' + col + ';display:inline-block;margin-right:6px;flex-shrink:0;';
+    nameEl.insertBefore(swatch, nameEl.firstChild);
+    if (fac.isCustom) {
+      nameEl.appendChild(h('span', { className: 'wr-badge', style: { marginLeft: '8px' } }, ['custom']));
+    }
+    row.appendChild(nameEl);
+
+    var valSpan = h('div', { className: 'wr-val' }, ['' + currentVal]);
+    var slider = h('input', { type: 'range', min: '1', max: '25', value: '' + currentVal });
+    slider.style.accentColor = col;
+    slider.addEventListener('input', function() {
+      var newVal = parseInt(this.value);
+      if (newVal < 1) newVal = 1;
+      if (newVal > 25) newVal = 25;
+      this.value = newVal;
+      if (fac.isCustom) fac.cw.weight = newVal;
+      else weights[fac.k] = newVal;
+      currentVal = newVal;
+      valSpan.textContent = '' + newVal;
+      rescoreAll();
+      updatePctBar();
+    });
+    row.appendChild(slider);
+    row.appendChild(valSpan);
+
+    if (fac.isCustom) {
+      row.appendChild(h('button', { className: 'wr-delete', onClick: function() {
+        if (confirm('Remove "' + fac.l + '" from scoring?')) {
+          var idx = customWeights.indexOf(fac.cw);
+          if (idx !== -1) customWeights.splice(idx, 1);
+          rescoreAll(); render(); toast('Removed ' + fac.l);
+        }
+      } }, ['\u2715']));
+    }
+
+    card.appendChild(row);
+  });
+
+  if (allFactors.length === 6 && customWeights.length === 0) {
+    card.appendChild(h('div', { className: 'text-muted text-sm', style: { textAlign: 'center', padding: '12px 0', borderTop: '1px solid var(--gray-100)', marginTop: '8px' } }, [
+      'Click "Add Factor" to create custom scoring criteria from your Excel data.'
+    ]));
+  }
+
+  ct.appendChild(card);
+
+  // Integrations
+  var api = h('div', { className: 'card' });
+  api.appendChild(h('div', { className: 'card-header' }, [h('h2', {}, ['Integrations'])]));
+  var fg = h('div', { className: 'form-group' });
+  fg.appendChild(h('label', {}, ['Zillow API Key (for future integration)']));
+  fg.appendChild(h('input', { type: 'password', placeholder: 'Enter API key...' }));
+  fg.appendChild(h('div', { className: 'text-sm text-muted mt-8' }, ['Stored in memory only. Cleared when you close the tab.']));
+  api.appendChild(fg);
+  ct.appendChild(api);
+
+  // Privacy / Clear
+  var dz = h('div', { className: 'card' });
+  dz.appendChild(h('div', { className: 'card-header' }, [h('h2', {}, ['Data & Privacy'])]));
+  dz.appendChild(h('p', { className: 'text-sm text-muted mb-16' }, ['ProspectPro uses zero data storage. All prospect data exists only in your browser\'s memory. No data is saved to disk, sent to servers, or stored in cookies. When you close or refresh this tab, all data is permanently erased.']));
+  dz.appendChild(h('button', { className: 'btn-danger btn-sm', onClick: function() {
+    if (confirm('Are you sure you want to clear ALL prospect data? This cannot be undone.')) {
+      prospects = []; nextId = 1; toast('All data cleared'); render(); updateAlertBadge();
+    }
+  } }, ['\u26A0 Clear All Data']));
+  ct.appendChild(dz);
+}
+
+function showAddWeightModal() {
+  closeModal();
+  var overlay = h('div', { className: 'modal-overlay', onClick: function(e) { if (e.target === overlay) closeModal(); } });
+  var modal = h('div', { className: 'modal', style: { maxWidth: '480px' } });
+  modal.appendChild(h('div', { className: 'modal-header' }, [h('h2', {}, ['Add Custom Scoring Factor']), h('button', { className: 'modal-close', onClick: closeModal }, ['\u00D7'])]));
+
+  var body = h('div', { className: 'modal-body' });
+  var inputs = {};
+
+  var fg1 = h('div', { className: 'form-group' });
+  fg1.appendChild(h('label', {}, ['Factor Name *']));
+  inputs.label = h('input', { type: 'text', placeholder: 'e.g., Giving Capacity, Board Score, Event Attendance' });
+  fg1.appendChild(inputs.label);
+  body.appendChild(fg1);
+
+  var fg2 = h('div', { className: 'form-group' });
+  fg2.appendChild(h('label', {}, ['Maximum Value (for normalization) *']));
+  inputs.maxVal = h('input', { type: 'number', placeholder: 'e.g., 100, 1000000, 10', value: '100' });
+  fg2.appendChild(inputs.maxVal);
+  fg2.appendChild(h('div', { className: 'text-sm text-muted mt-8' }, ['Prospect values are normalized against this max to produce a 0-100 score.']));
+  body.appendChild(fg2);
+
+  var fg3 = h('div', { className: 'form-group' });
+  fg3.appendChild(h('label', {}, ['Weight (1\u201325)']));
+  inputs.weight = h('input', { type: 'number', placeholder: '10', value: '10', min: '1', max: '25' });
+  fg3.appendChild(inputs.weight);
+  body.appendChild(fg3);
+
+  modal.appendChild(body);
+  modal.appendChild(h('div', { className: 'modal-footer' }, [
+    h('button', { className: 'btn-outline', onClick: closeModal }, ['Cancel']),
+    h('button', { className: 'btn-primary', onClick: function() {
+      var label = inputs.label.value.trim();
+      if (!label) { toast('Factor name is required'); return; }
+      var maxVal = parseFloat(inputs.maxVal.value) || 100;
+      var w = Math.min(25, Math.max(1, parseInt(inputs.weight.value) || 1));
+      var key = 'custom_' + label.toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_');
+      if (customWeights.some(function(cw) { return cw.key === key; })) {
+        toast('A factor with that name already exists'); return;
+      }
+      customWeights.push({ key: key, label: label, weight: w, maxVal: maxVal });
+      rescoreAll(); closeModal();
+      toast('Added "' + label + '" (' + w + ' pts)');
+      render();
+    } }, ['Add Factor'])
+  ]));
+  overlay.appendChild(modal);
+  $('#modal-root').appendChild(overlay);
+}
+
+// ===== APP SETTINGS =====
+function renderAppSettings(ct) {
+  // === FUNDRAISER PROFILE ===
+  var profCard = h('div', { className: 'card' });
+  profCard.appendChild(h('div', { className: 'card-header' }, [h('h2', {}, ['My Profile']), h('span', { className: 'text-sm text-muted' }, ['Personalizes all outreach templates'])]));
+
+  var pInputs = {};
+  var profFields = [
+    [{k:'name',l:'Your Full Name',ph:'e.g., Sarah Johnson'},{k:'title',l:'Your Title',ph:'e.g., Senior Development Officer'}],
+    [{k:'orgName',l:'Organization Name',ph:'e.g., Valley Community Foundation'},{k:'email',l:'Your Email',ph:'e.g., sarah@foundation.org'}],
+    [{k:'phone',l:'Your Phone',ph:'e.g., (555) 123-4567'},{k:'campaignName',l:'Campaign / Initiative Name',ph:'e.g., 2026 Annual Fund, Capital Campaign'}],
+  ];
+  profFields.forEach(function(grp) {
+    var row = h('div', { className: 'form-row' });
+    grp.forEach(function(f) {
+      var fg = h('div', { className: 'form-group' });
+      fg.appendChild(h('label', {}, [f.l]));
+      var inp = h('input', { type: 'text', placeholder: f.ph, value: profile[f.k] || '' });
+      inp.addEventListener('change', function() { profile[f.k] = this.value.trim(); });
+      pInputs[f.k] = inp;
+      fg.appendChild(inp);
+      row.appendChild(fg);
+    });
+    profCard.appendChild(row);
+  });
+
+  // Org mission
+  var fgMission = h('div', { className: 'form-group' });
+  fgMission.appendChild(h('label', {}, ['Organization Mission (brief)']));
+  var mInp = h('input', { type: 'text', placeholder: 'e.g., providing education to underserved youth, curing childhood cancer', value: profile.orgMission || '' });
+  mInp.addEventListener('change', function() { profile.orgMission = this.value.trim(); });
+  fgMission.appendChild(mInp);
+  profCard.appendChild(fgMission);
+
+  // Signature
+  var fgSig = h('div', { className: 'form-group' });
+  fgSig.appendChild(h('label', {}, ['Email Signature Block']));
+  var sigInp = h('textarea', { rows: '2', placeholder: 'Your Name\nYour Title\n(555) 123-4567 | email@org.com' });
+  sigInp.value = profile.signature || '';
+  sigInp.addEventListener('change', function() { profile.signature = this.value.trim(); });
+  fgSig.appendChild(sigInp);
+  profCard.appendChild(fgSig);
+
+  ct.appendChild(profCard);
+
+  // === OUTREACH PERSONALIZATION ===
+  var outCard = h('div', { className: 'card' });
+  outCard.appendChild(h('div', { className: 'card-header' }, [h('h2', {}, ['Outreach Personalization'])]));
+
+  // Tone
+  var fgTone = h('div', { className: 'form-group' });
+  fgTone.appendChild(h('label', {}, ['Communication Tone']));
+  var toneSel = h('select');
+  [{v:'formal',l:'Formal \u2014 Traditional, respectful phrasing'},{v:'warm-professional',l:'Warm-Professional \u2014 Approachable yet polished (default)'},{v:'casual',l:'Casual \u2014 Friendly, relaxed language'}].forEach(function(o) {
+    var opt = h('option', { value: o.v }, [o.l]);
+    if (profile.tone === o.v) opt.selected = true;
+    toneSel.appendChild(opt);
+  });
+  toneSel.addEventListener('change', function() { profile.tone = this.value; toast('Tone set to ' + this.value); });
+  fgTone.appendChild(toneSel);
+  outCard.appendChild(fgTone);
+
+  // Upcoming event
+  var evRow = h('div', { className: 'form-row' });
+  var fgEv = h('div', { className: 'form-group' });
+  fgEv.appendChild(h('label', {}, ['Upcoming Event']));
+  var evInp = h('input', { type: 'text', placeholder: 'e.g., Annual Gala, Spring Campus Tour, Impact Breakfast', value: profile.upcomingEvent || '' });
+  evInp.addEventListener('change', function() { profile.upcomingEvent = this.value.trim(); });
+  fgEv.appendChild(evInp);
+  evRow.appendChild(fgEv);
+  var fgEvD = h('div', { className: 'form-group' });
+  fgEvD.appendChild(h('label', {}, ['Event Date']));
+  var evDInp = h('input', { type: 'text', placeholder: 'e.g., April 15, 2026', value: profile.eventDate || '' });
+  evDInp.addEventListener('change', function() { profile.eventDate = this.value.trim(); });
+  fgEvD.appendChild(evDInp);
+  evRow.appendChild(fgEvD);
+  outCard.appendChild(evRow);
+
+  // Newsletter update
+  var fgNews = h('div', { className: 'form-group' });
+  fgNews.appendChild(h('label', {}, ['Newsletter / Donor Update']));
+  var newsInp = h('textarea', { rows: '2', placeholder: 'e.g., We just broke ground on the new community center! Construction begins this spring.' });
+  newsInp.value = profile.newsletterUpdate || '';
+  newsInp.addEventListener('change', function() { profile.newsletterUpdate = this.value.trim(); });
+  fgNews.appendChild(newsInp);
+  fgNews.appendChild(h('div', { className: 'text-sm text-muted mt-8' }, ['This will be woven into outreach emails and scripts as a timely update.']));
+  outCard.appendChild(fgNews);
+
+  // Talking points / Impact stories
+  var fgTp = h('div', { className: 'form-group' });
+  fgTp.appendChild(h('label', {}, ['Impact Stories & Talking Points']));
+  fgTp.appendChild(h('div', { className: 'text-sm text-muted', style: { marginBottom: '8px' } }, ['Add stories or facts that resonate with donors. One will be randomly selected for each outreach piece.']));
+
+  var tpContainer = h('div', { style: { display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '8px' } });
+  function rebuildTpTags() {
+    tpContainer.innerHTML = '';
+    profile.talkingPoints.forEach(function(tp, i) {
+      var tag = h('span', { className: 'tp-tag' }, [
+        tp.length > 60 ? tp.slice(0, 60) + '...' : tp,
+        h('span', { className: 'tp-x', onClick: function() { profile.talkingPoints.splice(i, 1); rebuildTpTags(); } }, ['\u00D7'])
+      ]);
+      tpContainer.appendChild(tag);
+    });
+    if (profile.talkingPoints.length === 0) {
+      tpContainer.appendChild(h('span', { className: 'text-sm text-muted' }, ['No talking points yet. Add one below.']));
+    }
+  }
+  rebuildTpTags();
+  fgTp.appendChild(tpContainer);
+
+  var tpRow = h('div', { style: { display: 'flex', gap: '8px' } });
+  var tpInp = h('input', { type: 'text', placeholder: 'e.g., Last year we provided 50 scholarships to first-generation students' });
+  tpRow.appendChild(tpInp);
+  tpRow.appendChild(h('button', { className: 'btn-primary btn-sm', style: { whiteSpace: 'nowrap' }, onClick: function() {
+    var val = tpInp.value.trim();
+    if (val) { profile.talkingPoints.push(val); tpInp.value = ''; rebuildTpTags(); toast('Talking point added'); }
+  } }, ['Add']));
+  fgTp.appendChild(tpRow);
+  outCard.appendChild(fgTp);
+
+  ct.appendChild(outCard);
+
+  // === THEME ===
+  var themeCard = h('div', { className: 'card' });
+  themeCard.appendChild(h('div', { className: 'card-header' }, [h('h2', {}, ['Color Theme'])]));
+  themeCard.appendChild(h('p', { className: 'text-muted text-sm mb-16' }, ['Choose a color scheme that matches your organization\'s brand.']));
+  var grid = h('div', { className: 'theme-grid' });
+  THEMES.forEach(function(theme) {
+    var swatch = h('div', { className: 'theme-swatch' + (currentTheme === theme.id ? ' active' : ''), onClick: function() {
+      applyTheme(theme.id);
+      grid.querySelectorAll('.theme-swatch').forEach(function(s) { s.classList.remove('active'); });
+      swatch.classList.add('active');
+      toast('Theme changed to ' + theme.name);
+    } });
+    var colors = h('div', { className: 'swatch-colors' });
+    colors.appendChild(h('div', { style: { background: theme.sidebar } }));
+    colors.appendChild(h('div', { style: { background: theme.primary } }));
+    colors.appendChild(h('div', { style: { background: theme.dark } }));
+    colors.appendChild(h('div', { style: { background: theme.accent } }));
+    swatch.appendChild(colors);
+    swatch.appendChild(h('div', { className: 'swatch-name' }, [theme.name]));
+    grid.appendChild(swatch);
+  });
+  themeCard.appendChild(grid);
+  ct.appendChild(themeCard);
+
+  // === GENERAL SETTINGS ===
+  var genCard = h('div', { className: 'card' });
+  genCard.appendChild(h('div', { className: 'card-header' }, [h('h2', {}, ['General Settings'])]));
+
+  var row1 = h('div', { className: 'setting-row' });
+  row1.appendChild(h('div', {}, [
+    h('div', { className: 'sr-label' }, ['Default Pipeline Stage']),
+    h('div', { className: 'sr-desc' }, ['Stage assigned to new prospects when not specified'])
+  ]));
+  var stageSel = h('select');
+  STAGES.forEach(function(st) { var o = h('option', { value: st }, [st]); if (appSettings.defaultStage === st) o.selected = true; stageSel.appendChild(o); });
+  stageSel.addEventListener('change', function() { appSettings.defaultStage = this.value; toast('Default stage: ' + this.value); });
+  row1.appendChild(stageSel);
+  genCard.appendChild(row1);
+
+  var row2 = h('div', { className: 'setting-row' });
+  row2.appendChild(h('div', {}, [
+    h('div', { className: 'sr-label' }, ['Show Scores on Pipeline Cards']),
+    h('div', { className: 'sr-desc' }, ['Display score badges on Kanban board cards'])
+  ]));
+  var tog2 = h('div', { className: 'toggle-switch' + (appSettings.showScoreOnCards ? ' on' : '') });
+  tog2.addEventListener('click', function() { appSettings.showScoreOnCards = !appSettings.showScoreOnCards; tog2.classList.toggle('on'); render(); });
+  row2.appendChild(tog2);
+  genCard.appendChild(row2);
+
+  var row3 = h('div', { className: 'setting-row' });
+  row3.appendChild(h('div', {}, [
+    h('div', { className: 'sr-label' }, ['Compact Table View']),
+    h('div', { className: 'sr-desc' }, ['Reduce row padding in prospect tables for denser display'])
+  ]));
+  var tog3 = h('div', { className: 'toggle-switch' + (appSettings.compactTables ? ' on' : '') });
+  tog3.addEventListener('click', function() {
+    appSettings.compactTables = !appSettings.compactTables;
+    tog3.classList.toggle('on');
+  });
+  row3.appendChild(tog3);
+  genCard.appendChild(row3);
+
+  var row4 = h('div', { className: 'setting-row' });
+  row4.appendChild(h('div', {}, [
+    h('div', { className: 'sr-label' }, ['Critical Alert Threshold (days)']),
+    h('div', { className: 'sr-desc' }, ['Days without contact before a prospect is flagged critical'])
+  ]));
+  var critInput = h('input', { type: 'number', value: '' + appSettings.alertThresholdCritical, min: '30', max: '365', style: { width: '80px', minWidth: '80px' } });
+  critInput.addEventListener('change', function() { appSettings.alertThresholdCritical = parseInt(this.value) || 180; toast('Critical threshold: ' + appSettings.alertThresholdCritical + ' days'); });
+  row4.appendChild(critInput);
+  genCard.appendChild(row4);
+
+  var row5 = h('div', { className: 'setting-row' });
+  row5.appendChild(h('div', {}, [
+    h('div', { className: 'sr-label' }, ['Warning Alert Threshold (days)']),
+    h('div', { className: 'sr-desc' }, ['Days without contact before a prospect gets a warning'])
+  ]));
+  var warnInput = h('input', { type: 'number', value: '' + appSettings.alertThresholdWarning, min: '14', max: '365', style: { width: '80px', minWidth: '80px' } });
+  warnInput.addEventListener('change', function() { appSettings.alertThresholdWarning = parseInt(this.value) || 90; toast('Warning threshold: ' + appSettings.alertThresholdWarning + ' days'); });
+  row5.appendChild(warnInput);
+  genCard.appendChild(row5);
+
+  ct.appendChild(genCard);
+
+  // About
+  var aboutCard = h('div', { className: 'card' });
+  aboutCard.appendChild(h('div', { className: 'card-header' }, [h('h2', {}, ['About ProspectPro'])]));
+  aboutCard.appendChild(h('p', { className: 'text-sm text-muted' }, [
+    'ProspectPro is a zero-infrastructure fundraising intelligence tool. All data processing happens locally in your browser. ' +
+    'No accounts, no servers, no tracking. Built for development officers who need powerful prospect management without IT overhead.'
+  ]));
+  aboutCard.appendChild(h('div', { className: 'text-sm text-muted mt-8' }, ['Version 2.0 \u2022 Zero Data Storage \u2022 Single-file deployment']));
+  ct.appendChild(aboutCard);
+}
+
+// ===== PROSPECT DETAIL MODAL =====
+function openProspectDetail(id) {
+  var p = prospects.find(function(pr) { return pr.id === id; });
+  if (!p) return;
+  var activeTab = 'overview';
+
+  function build() {
+    closeModal();
+    var overlay = h('div', { className: 'modal-overlay', onClick: function(e) { if (e.target === overlay) closeModal(); } });
+    var modal = h('div', { className: 'modal' });
+
+    modal.appendChild(h('div', { className: 'modal-header' }, [
+      h('h2', {}, [(p.firstName + ' ' + p.lastName).trim()]),
+      h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } }, [
+        h('span', { className: 'stage-badge ' + stageClass(p.stage) }, [p.stage]),
+        h('span', { className: 'score-badge ' + scoreClass(p.score) }, ['' + p.score]),
+        h('button', { className: 'modal-close', onClick: closeModal }, ['\u00D7'])
+      ])
+    ]));
+
+    var tabs = h('div', { className: 'tabs', style: { padding: '0 24px' } });
+    ['overview','outreach','edit'].forEach(function(t) {
+      tabs.appendChild(h('button', { className: 'tab-btn' + (t === activeTab ? ' active' : ''), onClick: function() { activeTab = t; build(); } }, [t.charAt(0).toUpperCase() + t.slice(1)]));
+    });
+    modal.appendChild(tabs);
+
+    var body = h('div', { className: 'modal-body' });
+
+    if (activeTab === 'overview') {
+      var ds = daysSince(p.lastContact);
+      var grid = h('div', { className: 'form-row mb-16' });
+      var left = h('div');
+      [['Email', p.email],['Phone', p.phone],['Address', p.address],['Last Contact', fmtDate(p.lastContact) + (ds < 999 ? ' (' + ds + ' days ago)' : '')]].forEach(function(r) {
+        left.appendChild(h('div', { className: 'text-sm text-muted' }, [r[0]]));
+        left.appendChild(h('div', { style: { fontWeight: '500', marginBottom: '8px' } }, [r[1] || '\u2014']));
+      });
+      grid.appendChild(left);
+      var right = h('div');
+      right.appendChild(h('div', { className: 'text-sm text-muted' }, ['Pledge Amount']));
+      right.appendChild(h('div', { style: { fontWeight: '700', fontSize: '18px', color: 'var(--green)', marginBottom: '8px' } }, [fmt$(p.pledge)]));
+      [['Lifetime Giving', fmt$(p.lifetime)],['Home Value', fmt$(p.homeValue)],['Est. Salary', fmt$(p.salary)]].forEach(function(r) {
+        right.appendChild(h('div', { className: 'text-sm text-muted' }, [r[0]]));
+        right.appendChild(h('div', { style: { fontWeight: '500', marginBottom: '8px' } }, [r[1]]));
+      });
+      grid.appendChild(right);
+      body.appendChild(grid);
+
+      // Score breakdown bar chart
+      body.appendChild(h('h3', { style: { marginBottom: '8px', fontSize: '14px', fontWeight: '600' } }, ['Score Breakdown']));
+      var chart = h('div', { className: 'bar-chart' });
+      var labels = { homeValue:'Home Value', salary:'Salary', pledge:'Pledge', lifetime:'Lifetime', recency:'Recency', engagement:'Engagement' };
+      var barColors = { homeValue:'var(--blue)', salary:'var(--indigo)', pledge:'var(--green)', lifetime:'var(--purple)', recency:'var(--amber)', engagement:'#ec4899' };
+      var customBarColors = ['#06b6d4','#f43f5e','#8b5cf6','#14b8a6','#f59e0b','#6366f1'];
+      customWeights.forEach(function(cw, ci) { labels[cw.key] = cw.label; barColors[cw.key] = customBarColors[ci % customBarColors.length]; });
+      var tw = getTotalWeight() || 1;
+      if (p.factors) {
+        Object.keys(labels).forEach(function(k) {
+          var w = weights[k] != null ? weights[k] : 0;
+          if (w === 0 && !weights.hasOwnProperty(k)) {
+            var cw = customWeights.find(function(c) { return c.key === k; });
+            if (cw) w = cw.weight;
+          }
+          var contrib = (p.factors[k] || 0) * w / tw;
+          chart.appendChild(h('div', { className: 'bar-row' }, [
+            h('div', { className: 'bar-label' }, [labels[k]]),
+            h('div', { className: 'bar-track' }, [h('div', { className: 'bar-fill', style: { width: Math.max(2, contrib) + '%', background: barColors[k] } }, [Math.round(p.factors[k] || 0) + ''])]),
+            h('div', { className: 'bar-value' }, ['w:' + w])
+          ]));
+        });
+      }
+      body.appendChild(chart);
+
+      // Stage selector
+      body.appendChild(h('h3', { style: { margin: '16px 0 8px', fontSize: '14px', fontWeight: '600' } }, ['Pipeline Stage']));
+      var sr = h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } });
+      STAGES.forEach(function(st) {
+        sr.appendChild(h('button', { className: (p.stage === st ? 'btn-primary' : 'btn-outline') + ' btn-sm', onClick: function() {
+          p.stage = st; toast('Moved to ' + st); build(); render(); updateAlertBadge();
+        } }, [st]));
+      });
+      body.appendChild(sr);
+
+      if (p.notes) {
+        body.appendChild(h('h3', { style: { margin: '16px 0 8px', fontSize: '14px', fontWeight: '600' } }, ['Notes']));
+        body.appendChild(h('div', { className: 'text-sm', style: { background: 'var(--gray-50)', padding: '12px', borderRadius: '6px' } }, [p.notes]));
+      }
+
+      body.appendChild(h('h3', { style: { margin: '16px 0 8px', fontSize: '14px', fontWeight: '600' } }, ['Recommendation']));
+      var rec = getRecommendation(p);
+      body.appendChild(h('div', { style: { padding: '12px', borderRadius: '6px', fontWeight: '600', fontSize: '13px', background: rec.indexOf('OVERDUE') !== -1 ? 'var(--red-light)' : 'var(--blue-light)', color: rec.indexOf('OVERDUE') !== -1 ? 'var(--red)' : 'var(--blue)' } }, [rec]));
+
+    } else if (activeTab === 'outreach') {
+      var selCh = 'Email';
+      var chBtns = h('div', { style: { display: 'flex', gap: '8px', marginBottom: '16px' } });
+      var oContent = h('div');
+
+      function rebuildO() {
+        oContent.innerHTML = '';
+        var text = generateOutreach(p, selCh);
+        oContent.appendChild(h('div', { className: 'outreach-content' }, [text]));
+        oContent.appendChild(h('div', { style: { display: 'flex', gap: '8px', marginTop: '16px' } }, [
+          h('button', { className: 'btn-primary btn-sm', onClick: function() { copyText(text); } }, ['\uD83D\uDCCB Copy']),
+          h('button', { className: 'btn-outline btn-sm', onClick: function() { exportProspectOutreach(p); } }, ['\uD83D\uDCE5 Export'])
+        ]));
+      }
+
+      ['Email','Phone','LinkedIn'].forEach(function(ch) {
+        chBtns.appendChild(h('button', { className: (ch === selCh ? 'btn-primary' : 'btn-outline') + ' btn-sm', onClick: function() {
+          selCh = ch;
+          chBtns.querySelectorAll('button').forEach(function(b, i) { b.className = (['Email','Phone','LinkedIn'][i] === selCh ? 'btn-primary' : 'btn-outline') + ' btn-sm'; });
+          rebuildO();
+        } }, [ch]));
+      });
+      body.appendChild(chBtns);
+      body.appendChild(oContent);
+      rebuildO();
+
+    } else if (activeTab === 'edit') {
+      var fields = [
+        {k:'firstName',l:'First Name *',t:'text'},{k:'lastName',l:'Last Name *',t:'text'},
+        {k:'email',l:'Email',t:'email'},{k:'phone',l:'Phone',t:'tel'},
+        {k:'address',l:'Address',t:'text'},{k:'occupation',l:'Occupation',t:'text'},
+        {k:'pledge',l:'Pledge Amount ($)',t:'number'},{k:'lifetime',l:'Lifetime Giving ($)',t:'number'},
+        {k:'homeValue',l:'Home Value ($)',t:'number'},{k:'salary',l:'Salary / Income ($)',t:'number'},
+        {k:'lastContact',l:'Last Contact Date',t:'date'},
+        {k:'engagement',l:'Engagement Level',t:'select',opts:['unknown','low','medium','high']},
+        {k:'stage',l:'Pipeline Stage',t:'select',opts:STAGES},
+        {k:'notes',l:'Notes',t:'textarea'}
+      ];
+      var inputs = {};
+      fields.forEach(function(f) {
+        var fg = h('div', { className: 'form-group' });
+        fg.appendChild(h('label', {}, [f.l]));
+        var inp;
+        if (f.t === 'select') {
+          inp = h('select');
+          f.opts.forEach(function(o) { var opt = h('option', { value: o }, [o]); if (p[f.k] === o) opt.selected = true; inp.appendChild(opt); });
+        } else if (f.t === 'textarea') {
+          inp = h('textarea', { rows: '3' }); inp.value = p[f.k] || '';
+        } else {
+          inp = h('input', { type: f.t });
+          if (f.t === 'date' && p[f.k]) { var dt = new Date(p[f.k]); if (!isNaN(dt.getTime())) inp.value = dt.toISOString().slice(0, 10); }
+          else inp.value = p[f.k] != null ? p[f.k] : '';
+        }
+        inputs[f.k] = inp;
+        fg.appendChild(inp);
+        body.appendChild(fg);
+      });
+
+      body.appendChild(h('div', { style: { display: 'flex', justifyContent: 'space-between', marginTop: '16px' } }, [
+        h('button', { className: 'btn-danger btn-sm', onClick: function() {
+          if (confirm('Delete ' + p.firstName + ' ' + p.lastName + '?')) {
+            prospects = prospects.filter(function(pr) { return pr.id !== p.id; });
+            closeModal(); toast('Deleted'); render(); updateAlertBadge();
+          }
+        } }, ['Delete']),
+        h('div', { style: { display: 'flex', gap: '8px' } }, [
+          h('button', { className: 'btn-outline btn-sm', onClick: closeModal }, ['Cancel']),
+          h('button', { className: 'btn-primary btn-sm', onClick: function() {
+            p.firstName = inputs.firstName.value.trim() || p.firstName;
+            p.lastName = inputs.lastName.value.trim() || p.lastName;
+            p.email = inputs.email.value.trim();
+            p.phone = inputs.phone.value.trim();
+            p.address = inputs.address.value.trim();
+            p.occupation = inputs.occupation.value.trim();
+            p.pledge = parseFloat(inputs.pledge.value) || 0;
+            p.lifetime = parseFloat(inputs.lifetime.value) || 0;
+            p.homeValue = parseFloat(inputs.homeValue.value) || 0;
+            p.salary = parseFloat(inputs.salary.value) || 0;
+            if (!p.salary && p.occupation) p.salary = estimateSalary(p.occupation);
+            p.lastContact = inputs.lastContact.value ? new Date(inputs.lastContact.value) : p.lastContact;
+            p.engagement = inputs.engagement.value;
+            p.stage = inputs.stage.value;
+            p.notes = inputs.notes.value.trim();
+            scoreProspect(p);
+            closeModal(); toast('Updated'); render(); updateAlertBadge();
+          } }, ['Save Changes'])
+        ])
+      ]));
+    }
+
+    modal.appendChild(body);
+    overlay.appendChild(modal);
+    $('#modal-root').appendChild(overlay);
+  }
+  build();
+}
+
+function closeModal() { $('#modal-root').innerHTML = ''; }
+
+// ===== IMPORT MODAL =====
+window.showImportModal = function() {
+  closeModal();
+  var overlay = h('div', { className: 'modal-overlay', onClick: function(e) { if (e.target === overlay) closeModal(); } });
+  var modal = h('div', { className: 'modal' });
+  modal.appendChild(h('div', { className: 'modal-header' }, [h('h2', {}, ['Import Prospect Data']), h('button', { className: 'modal-close', onClick: closeModal }, ['\u00D7'])]));
+
+  var body = h('div', { className: 'modal-body' });
+  var dropZone = h('div', { className: 'drop-zone' }, [
+    h('div', { className: 'dz-icon' }, ['\uD83D\uDCC1']),
+    h('div', { className: 'dz-text' }, ['Drag & drop your file here']),
+    h('div', { className: 'dz-sub' }, ['Supports .xlsx, .xls, .csv, .tsv'])
+  ]);
+  var fileInput = h('input', { type: 'file', accept: '.xlsx,.xls,.csv,.tsv', style: { display: 'none' } });
+  dropZone.appendChild(fileInput);
+  dropZone.addEventListener('click', function() { fileInput.click(); });
+  dropZone.addEventListener('dragover', function(e) { e.preventDefault(); dropZone.classList.add('dragover'); });
+  dropZone.addEventListener('dragleave', function() { dropZone.classList.remove('dragover'); });
+  dropZone.addEventListener('drop', function(e) { e.preventDefault(); dropZone.classList.remove('dragover'); if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
+  fileInput.addEventListener('change', function() { if (this.files[0]) handleFile(this.files[0]); });
+  body.appendChild(dropZone);
+
+  var mappingArea = h('div', { className: 'hidden' });
+  body.appendChild(mappingArea);
+  modal.appendChild(body);
+  overlay.appendChild(modal);
+  $('#modal-root').appendChild(overlay);
+
+  var parsedRows = [], parsedHeaders = [];
+
+  var fieldDefs = [
+    {k:'firstName',l:'First Name',req:true,kw:['first name','first','fname','first_name']},
+    {k:'lastName',l:'Last Name',req:true,kw:['last name','last','lname','surname','last_name']},
+    {k:'address',l:'Address',kw:['address','street','mailing']},
+    {k:'occupation',l:'Occupation',kw:['occupation','job','title','position']},
+    {k:'phone',l:'Phone',kw:['phone','cell','mobile','tel']},
+    {k:'email',l:'Email',kw:['email','e-mail','e_mail']},
+    {k:'lastContact',l:'Last Contact Date',kw:['last contact','contact date','last_contact','contactdate']},
+    {k:'pledge',l:'Pledge Amount',kw:['pledge','gift amount','donation','gift_amount']},
+    {k:'lifetime',l:'Lifetime Giving',kw:['lifetime','total giving','cumulative','lifetime_giving']},
+    {k:'homeValue',l:'Home Value',kw:['home value','zillow','property value','net worth','home_value','networth']},
+    {k:'salary',l:'Salary / Income',kw:['salary','income','compensation']},
+    {k:'stage',l:'Pipeline Stage',kw:['stage','pipeline','status']},
+    {k:'notes',l:'Notes',kw:['notes','comments','remarks']},
+    {k:'engagement',l:'Engagement Level',kw:['engagement','interest level','interest']}
+  ];
+
+  function autoDetect(header) {
+    var hh = header.toLowerCase().replace(/[_\-]/g, ' ').trim();
+    for (var i = 0; i < fieldDefs.length; i++) {
+      for (var j = 0; j < fieldDefs[i].kw.length; j++) {
+        if (hh === fieldDefs[i].kw[j] || hh.indexOf(fieldDefs[i].kw[j]) !== -1) return fieldDefs[i].k;
+      }
+    }
+    return '';
+  }
+
+  function handleFile(file) {
+    var ext = file.name.split('.').pop().toLowerCase();
+    if (ext === 'csv' || ext === 'tsv') {
+      Papa.parse(file, { header: true, skipEmptyLines: true, complete: function(r) { parsedHeaders = r.meta.fields || []; parsedRows = r.data; showMapping(); } });
+    } else {
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        var wb = XLSX.read(e.target.result, { type: 'array' });
+        var json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' });
+        if (json.length > 0) { parsedHeaders = Object.keys(json[0]); parsedRows = json; showMapping(); }
+        else toast('No data found');
+      };
+      reader.readAsArrayBuffer(file);
+    }
+  }
+
+  function showMapping() {
+    dropZone.classList.add('hidden');
+    mappingArea.classList.remove('hidden');
+    mappingArea.innerHTML = '';
+    mappingArea.appendChild(h('h3', { style: { marginBottom: '4px' } }, ['Column Mapping']));
+    mappingArea.appendChild(h('p', { className: 'text-sm text-muted mb-16' }, ['Found ' + parsedRows.length + ' rows. Map your columns:']));
+
+    var grid = h('div', { className: 'mapping-grid' });
+    var selects = {};
+    parsedHeaders.forEach(function(hdr) {
+      grid.appendChild(h('label', {}, [hdr]));
+      grid.appendChild(h('div', { className: 'arrow' }, ['\u2192']));
+      var sel = h('select');
+      sel.appendChild(h('option', { value: '' }, ['-- Skip --']));
+      fieldDefs.forEach(function(f) { sel.appendChild(h('option', { value: f.k }, [f.l + (f.req ? ' *' : '')])); });
+      if (customWeights.length > 0) {
+        sel.appendChild(h('option', { value: '', disabled: 'disabled' }, ['\u2500\u2500 Custom Factors \u2500\u2500']));
+        customWeights.forEach(function(cw) { sel.appendChild(h('option', { value: cw.key }, ['\u2605 ' + cw.label])); });
+      }
+      sel.value = autoDetect(hdr);
+      selects[hdr] = sel;
+      grid.appendChild(sel);
+    });
+    mappingArea.appendChild(grid);
+    mappingArea.appendChild(h('div', { style: { display: 'flex', justifyContent: 'space-between', marginTop: '16px' } }, [
+      h('button', { className: 'btn-outline btn-sm', onClick: function() { dropZone.classList.remove('hidden'); mappingArea.classList.add('hidden'); } }, ['\u25C0 Back']),
+      h('button', { className: 'btn-primary', onClick: function() {
+        var mapping = {};
+        parsedHeaders.forEach(function(hdr) { if (selects[hdr].value) mapping[hdr] = selects[hdr].value; });
+        var vals = Object.keys(mapping).map(function(k) { return mapping[k]; });
+        if (vals.indexOf('firstName') === -1 || vals.indexOf('lastName') === -1) { toast('First Name and Last Name are required'); return; }
+        importRows(parsedRows, mapping);
+        closeModal();
+      } }, ['Import ' + parsedRows.length + ' Prospects'])
+    ]));
+  }
+};
+
+function importRows(rows, mapping) {
+  var rev = {};
+  Object.keys(mapping).forEach(function(hdr) { rev[mapping[hdr]] = hdr; });
+  var count = 0;
+  rows.forEach(function(row) {
+    var fn = (row[rev.firstName] || '').toString().trim();
+    var ln = (row[rev.lastName] || '').toString().trim();
+    if (!fn && !ln) return;
+    var p = {
+      id: nextId++, firstName: fn, lastName: ln,
+      email: (row[rev.email] || '').toString().trim(),
+      phone: (row[rev.phone] || '').toString().trim(),
+      address: (row[rev.address] || '').toString().trim(),
+      occupation: (row[rev.occupation] || '').toString().trim(),
+      pledge: parseNum(row[rev.pledge]),
+      lifetime: parseNum(row[rev.lifetime]),
+      homeValue: parseNum(row[rev.homeValue]),
+      salary: parseNum(row[rev.salary]),
+      lastContact: parseDate(row[rev.lastContact]),
+      stage: parseStage(row[rev.stage]),
+      notes: (row[rev.notes] || '').toString().trim(),
+      engagement: parseEng(row[rev.engagement]),
+      score: 0, factors: {}
+    };
+    p.customData = {};
+    customWeights.forEach(function(cw) {
+      if (rev[cw.key]) p.customData[cw.key] = parseNum(row[rev[cw.key]]);
+    });
+    if (!p.salary && p.occupation) p.salary = estimateSalary(p.occupation);
+    scoreProspect(p);
+    prospects.push(p);
+    count++;
+  });
+  toast('Imported ' + count + ' prospects!');
+  render(); updateAlertBadge();
+}
+
+function parseNum(v) { if (v == null || v === '') return 0; var n = parseFloat(String(v).replace(/[^0-9.\-]/g, '')); return isNaN(n) ? 0 : n; }
+function parseDate(v) {
+  if (!v) return null;
+  if (typeof v === 'number' && v > 10000 && v < 100000) return new Date((v - 25569) * 86400000);
+  var d = new Date(v); return isNaN(d.getTime()) ? null : d;
+}
+function parseStage(v) {
+  if (!v) return 'Prospect';
+  var s = v.toString().trim().toLowerCase();
+  for (var i = 0; i < STAGES.length; i++) { if (s.indexOf(STAGES[i].toLowerCase()) !== -1) return STAGES[i]; }
+  return 'Prospect';
+}
+function parseEng(v) {
+  if (!v) return 'unknown';
+  var s = v.toString().trim().toLowerCase();
+  if (s === 'high' || s === 'h') return 'high';
+  if (s === 'medium' || s === 'med' || s === 'm') return 'medium';
+  if (s === 'low' || s === 'l') return 'low';
+  return 'unknown';
+}
+
+// ===== ADD PROSPECT MODAL =====
+window.showAddProspectModal = function() {
+  closeModal();
+  var overlay = h('div', { className: 'modal-overlay', onClick: function(e) { if (e.target === overlay) closeModal(); } });
+  var modal = h('div', { className: 'modal' });
+  modal.appendChild(h('div', { className: 'modal-header' }, [h('h2', {}, ['Add Prospect']), h('button', { className: 'modal-close', onClick: closeModal }, ['\u00D7'])]));
+
+  var body = h('div', { className: 'modal-body' });
+  var inputs = {};
+  var groups = [
+    [{k:'firstName',l:'First Name *',t:'text'},{k:'lastName',l:'Last Name *',t:'text'}],
+    [{k:'email',l:'Email',t:'email'},{k:'phone',l:'Phone',t:'tel'}],
+    [{k:'address',l:'Address',t:'text'}],
+    [{k:'occupation',l:'Occupation',t:'text'},{k:'salary',l:'Salary ($)',t:'number'}],
+    [{k:'pledge',l:'Pledge Amount ($)',t:'number'},{k:'lifetime',l:'Lifetime Giving ($)',t:'number'}],
+    [{k:'homeValue',l:'Home Value ($)',t:'number'},{k:'lastContact',l:'Last Contact Date',t:'date'}],
+    [{k:'engagement',l:'Engagement Level',t:'select',opts:['unknown','low','medium','high']},{k:'stage',l:'Pipeline Stage',t:'select',opts:STAGES}],
+    [{k:'notes',l:'Notes',t:'textarea'}]
+  ];
+  groups.forEach(function(grp) {
+    var row = grp.length > 1 ? h('div', { className: 'form-row' }) : h('div');
+    grp.forEach(function(f) {
+      var fg = h('div', { className: 'form-group' });
+      fg.appendChild(h('label', {}, [f.l]));
+      var inp;
+      if (f.t === 'select') { inp = h('select'); f.opts.forEach(function(o) { inp.appendChild(h('option', { value: o }, [o])); }); }
+      else if (f.t === 'textarea') { inp = h('textarea', { rows: '3' }); }
+      else { inp = h('input', { type: f.t }); }
+      inputs[f.k] = inp;
+      fg.appendChild(inp);
+      row.appendChild(fg);
+    });
+    body.appendChild(row);
+  });
+
+  modal.appendChild(body);
+  modal.appendChild(h('div', { className: 'modal-footer' }, [
+    h('button', { className: 'btn-outline', onClick: closeModal }, ['Cancel']),
+    h('button', { className: 'btn-primary', onClick: function() {
+      var fn = inputs.firstName.value.trim(), ln = inputs.lastName.value.trim();
+      if (!fn || !ln) { toast('First and Last name are required'); return; }
+      var p = {
+        id: nextId++, firstName: fn, lastName: ln,
+        email: inputs.email.value.trim(), phone: inputs.phone.value.trim(),
+        address: inputs.address.value.trim(), occupation: inputs.occupation.value.trim(),
+        pledge: parseFloat(inputs.pledge.value) || 0, lifetime: parseFloat(inputs.lifetime.value) || 0,
+        homeValue: parseFloat(inputs.homeValue.value) || 0, salary: parseFloat(inputs.salary.value) || 0,
+        lastContact: inputs.lastContact.value ? new Date(inputs.lastContact.value) : null,
+        engagement: inputs.engagement.value, stage: inputs.stage.value,
+        notes: inputs.notes.value.trim(), score: 0, factors: {},
+        customData: {}
+      };
+      if (!p.salary && p.occupation) p.salary = estimateSalary(p.occupation);
+      scoreProspect(p);
+      prospects.push(p);
+      closeModal(); toast('Added ' + fn + ' ' + ln); render(); updateAlertBadge();
+    } }, ['Add Prospect'])
+  ]));
+  overlay.appendChild(modal);
+  $('#modal-root').appendChild(overlay);
+};
+
+// ===== EXPORTS =====
+window.exportFullReport = function() {
+  if (prospects.length === 0) { toast('No data to export'); return; }
+  var wb = XLSX.utils.book_new();
+  var sorted = prospects.slice().sort(function(a, b) { return b.score - a.score; });
+
+  var s1 = sorted.map(function(p, i) {
+    return { Rank: i+1, Score: p.score, 'First Name': p.firstName, 'Last Name': p.lastName,
+      Email: p.email, Phone: p.phone, Address: p.address, Occupation: p.occupation,
+      Stage: p.stage, Pledge: p.pledge, 'Lifetime Giving': p.lifetime,
+      'Home Value': p.homeValue, 'Est. Salary': p.salary,
+      'Last Contact': p.lastContact ? fmtDate(p.lastContact) : '',
+      'Days Since Contact': daysSince(p.lastContact) < 999 ? daysSince(p.lastContact) : '',
+      Engagement: p.engagement, Notes: p.notes
+    };
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(s1), 'All Prospects Ranked');
+
+  var s2 = sorted.map(function(p) {
+    var ds = daysSince(p.lastContact);
+    return { Name: (p.firstName+' '+p.lastName).trim(), Score: p.score, Stage: p.stage,
+      Urgency: ds >= 180 ? 'Critical' : ds >= 90 ? 'High' : 'Normal',
+      'Days Since Contact': ds < 999 ? ds : 'Unknown',
+      Recommendation: getRecommendation(p),
+      'Suggested Channel': p.stage === 'Solicit' ? 'Phone' : 'Email'
+    };
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(s2), 'Action Items');
+
+  var s3 = sorted.slice(0, 20).map(function(p) {
+    return { Name: (p.firstName+' '+p.lastName).trim(), Score: p.score, Stage: p.stage,
+      'Email Draft': generateOutreach(p, 'Email'),
+      'Phone Script': generateOutreach(p, 'Phone'),
+      'LinkedIn Message': generateOutreach(p, 'LinkedIn')
+    };
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(s3), 'Outreach Drafts');
+
+  var s4 = STAGES.map(function(st) {
+    var sp = prospects.filter(function(p) { return p.stage === st; });
+    return { Stage: st, Count: sp.length,
+      'Avg Score': sp.length ? Math.round(sp.reduce(function(s,p){return s+p.score;},0)/sp.length) : 0,
+      'Total Pledged': sp.reduce(function(s,p){return s+(p.pledge||0);},0)
+    };
+  });
+  s4.push({ Stage: 'TOTAL', Count: prospects.length,
+    'Avg Score': prospects.length ? Math.round(prospects.reduce(function(s,p){return s+p.score;},0)/prospects.length) : 0,
+    'Total Pledged': prospects.reduce(function(s,p){return s+(p.pledge||0);},0)
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(s4), 'Pipeline Summary');
+
+  var s5 = [
+    {Factor:'Home Value',Weight:weights.homeValue},{Factor:'Estimated Salary',Weight:weights.salary},
+    {Factor:'Pledge Amount',Weight:weights.pledge},{Factor:'Lifetime Giving',Weight:weights.lifetime},
+    {Factor:'Contact Recency',Weight:weights.recency},{Factor:'Engagement Level',Weight:weights.engagement}
+  ];
+  customWeights.forEach(function(cw) { s5.push({ Factor: cw.label + ' (custom)', Weight: cw.weight }); });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(s5), 'Scoring Weights');
+
+  XLSX.writeFile(wb, 'ProspectPro_Full_Report.xlsx');
+  toast('Full report exported!');
+};
+
+function exportProspects(list) {
+  if (!list.length) { toast('No data'); return; }
+  var wb = XLSX.utils.book_new();
+  var data = list.map(function(p, i) {
+    return { Rank: i+1, Score: p.score, 'First Name': p.firstName, 'Last Name': p.lastName,
+      Occupation: p.occupation, Stage: p.stage, Pledge: p.pledge, 'Lifetime Giving': p.lifetime,
+      'Home Value': p.homeValue, 'Est. Salary': p.salary,
+      'Last Contact': p.lastContact ? fmtDate(p.lastContact) : '', Engagement: p.engagement,
+      Recommendation: getRecommendation(p) };
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), 'Prospects');
+  XLSX.writeFile(wb, 'ProspectPro_Prospects.xlsx');
+  toast('Exported ' + list.length + ' prospects');
+}
+
+function exportTopN(n) {
+  exportProspects(prospects.slice().sort(function(a, b) { return b.score - a.score; }).slice(0, n));
+}
+
+function exportProspectOutreach(p) {
+  var wb = XLSX.utils.book_new();
+  var data = ['Email','Phone','LinkedIn'].map(function(ch) { return { Channel: ch, Outreach: generateOutreach(p, ch) }; });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), 'Outreach');
+  XLSX.writeFile(wb, 'Outreach_' + p.firstName + '_' + p.lastName + '.xlsx');
+  toast('Outreach exported');
+}
+
+// ===== CHATBOT =====
+var chatOpen = false;
+window.toggleChat = function() {
+  chatOpen = !chatOpen;
+  var panel = $('#chatbot-panel');
+  panel.classList.toggle('hidden', !chatOpen);
+  if (chatOpen && $('#chat-messages').children.length === 0) {
+    addBotMsg("Hi! I'm your ProspectPro assistant. I can help you navigate, find prospects, analyze your portfolio, draft strategy, and manage your pipeline.\n\nTry asking me things like:", [
+      'What should I do today?',
+      'Who needs follow-up?',
+      'Give me a strategy',
+      'Compare two prospects',
+      'Wealth analysis'
+    ]);
+    $('#chat-input').focus();
+  }
+};
+$('#chatbot-toggle').addEventListener('click', window.toggleChat);
+$('#chat-input').addEventListener('keydown', function(e) { if (e.key === 'Enter') window.sendChat(); });
+
+function addBotMsg(text, suggestions) {
+  var msgs = $('#chat-messages');
+  var msg = h('div', { className: 'chat-msg bot' });
+  msg.textContent = text;
+  if (suggestions && suggestions.length) {
+    var row = h('div', { className: 'chat-suggestions' });
+    suggestions.forEach(function(s) {
+      var chip = h('span', {}, [s]);
+      chip.addEventListener('click', function() { $('#chat-input').value = s; window.sendChat(); });
+      row.appendChild(chip);
+    });
+    msg.appendChild(row);
+  }
+  msgs.appendChild(msg);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function addUserMsg(text) {
+  var msgs = $('#chat-messages');
+  msgs.appendChild(h('div', { className: 'chat-msg user' }, [text]));
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function addBotAction(text, label, action) {
+  var msgs = $('#chat-messages');
+  var msg = h('div', { className: 'chat-msg bot' });
+  msg.appendChild(document.createTextNode(text));
+  if (label && action) {
+    var btn = h('span', { className: 'chat-action' }, [label]);
+    btn.addEventListener('click', action);
+    msg.appendChild(h('br'));
+    msg.appendChild(btn);
+  }
+  msgs.appendChild(msg);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+window.sendChat = function() {
+  var input = $('#chat-input');
+  var q = input.value.trim();
+  if (!q) return;
+  addUserMsg(q);
+  input.value = '';
+  setTimeout(function() { processChat(q); }, 200);
+};
+
+function processChat(q) {
+  var lower = q.toLowerCase();
+  if (prospects.length === 0 && !/help|what\s*can|import|upload|add|hi|hello|hey|good|setting|theme|go\s*to|show|open|navigate|profile/.test(lower)) {
+    addBotMsg('You don\'t have any prospects loaded yet. Import data or add prospects first!', ['Import data', 'Add a prospect']);
+    return;
+  }
+
+  // === NAVIGATION ===
+  if (/\b(go\s*to|show|open|navigate|take\s*me)\b.*\b(dashboard|home)\b/.test(lower)) { navigate('dashboard'); addBotMsg('Here\'s your dashboard.'); return; }
+  if (/\b(go\s*to|show|open|navigate|take\s*me)\b.*\b(prospect|list|all)\b/.test(lower) && !/pipeline/.test(lower) && !/top/.test(lower)) { navigate('prospects'); addBotMsg('Here\'s your full prospect list.'); return; }
+  if (/\b(go\s*to|show|open|navigate|take\s*me)\b.*\b(pipeline|kanban|board)\b/.test(lower)) { navigate('pipeline'); addBotMsg('Here\'s your pipeline board.'); return; }
+  if (/\b(go\s*to|show|open|navigate|take\s*me)\b.*\b(top|rank|best)\b/.test(lower)) { navigate('top'); addBotMsg('Here are your top-ranked prospects.'); return; }
+  if (/\b(go\s*to|show|open|navigate|take\s*me)\b.*\b(outreach|email|template|draft)\b/.test(lower)) { navigate('outreach'); addBotMsg('Here\'s the outreach page. Use the search bar to find specific prospects.'); return; }
+  if (/\b(go\s*to|show|open|navigate|take\s*me)\b.*\b(scor|weight)\b/.test(lower)) { navigate('settings'); addBotMsg('Here are your scoring weight settings.'); return; }
+  if (/\b(go\s*to|show|open|navigate|take\s*me)\b.*\b(setting|theme|config|preferences|profile)\b/.test(lower)) { navigate('appsettings'); addBotMsg('Here are your app settings. You can update your profile, theme, and outreach personalization here.'); return; }
+
+  // === PROFILE SETUP ===
+  if (/profile|personali|my\s*info|my\s*name|my\s*org|signature|talking\s*point|impact\s*stor|tone|campaign/.test(lower)) {
+    var hasProfile = profile.name && profile.orgName;
+    if (hasProfile) {
+      addBotAction('Your profile is set up:\n\nName: ' + profile.name + '\nTitle: ' + profile.title + '\nOrg: ' + profile.orgName + '\nTone: ' + profile.tone + '\nTalking points: ' + profile.talkingPoints.length + '\n\nYou can update it anytime in Settings.', 'Edit Profile \u2192', function() { navigate('appsettings'); });
+    } else {
+      addBotAction('Set up your profile in Settings to personalize all outreach templates with your name, organization, talking points, and more.', 'Go to Settings \u2192', function() { navigate('appsettings'); });
+    }
+    return;
+  }
+
+  // === COMPARE PROSPECTS ===
+  if (/compare|vs\b|versus|side.by.side|difference\s*between/.test(lower)) {
+    var names = lower.replace(/compare|vs|versus|and|between|side.by.side|difference|the|prospects?/gi, '').trim().split(/\s{2,}|\s*,\s*|\s+and\s+|\s+vs\.?\s+|\s+to\s+/);
+    names = names.map(function(n) { return n.trim(); }).filter(function(n) { return n.length > 1; });
+    if (names.length < 2) { addBotMsg('Name two prospects to compare. Try: "Compare John Smith vs Jane Doe"'); return; }
+    var p1 = prospects.find(function(p) { return (p.firstName + ' ' + p.lastName).toLowerCase().indexOf(names[0]) !== -1; });
+    var p2 = prospects.find(function(p) { return (p.firstName + ' ' + p.lastName).toLowerCase().indexOf(names[1]) !== -1; });
+    if (!p1) { addBotMsg('Couldn\'t find "' + names[0] + '" in your prospects.'); return; }
+    if (!p2) { addBotMsg('Couldn\'t find "' + names[1] + '" in your prospects.'); return; }
+    var msg = 'Comparison: ' + p1.firstName + ' vs ' + p2.firstName + '\n\n';
+    msg += 'Score: ' + p1.score + ' vs ' + p2.score + (p1.score > p2.score ? ' \u2190 higher' : p2.score > p1.score ? ' \u2192 higher' : ' (tied)') + '\n';
+    msg += 'Stage: ' + p1.stage + ' vs ' + p2.stage + '\n';
+    msg += 'Pledge: ' + fmt$(p1.pledge) + ' vs ' + fmt$(p2.pledge) + '\n';
+    msg += 'Lifetime: ' + fmt$(p1.lifetime) + ' vs ' + fmt$(p2.lifetime) + '\n';
+    msg += 'Last Contact: ' + daysSince(p1.lastContact) + 'd vs ' + daysSince(p2.lastContact) + 'd ago\n\n';
+    var winner = p1.score >= p2.score ? p1 : p2;
+    msg += 'Recommendation: Prioritize ' + winner.firstName + ' ' + winner.lastName + ' (higher score). ';
+    if (daysSince(winner.lastContact) > 60) msg += 'But note: they\'re overdue for contact.';
+    addBotMsg(msg);
+    return;
+  }
+
+  // === FILTER QUERIES ===
+  if (/\b(over|above|more\s*than|greater|exceeds?|at\s*least)\b.*\b(\$?\d[\d,]*)\b/.test(lower) || /\b(\$?\d[\d,]*)\b.*\b(or\s*more|plus|\+)\b/.test(lower)) {
+    var amtMatch = lower.match(/\$?([\d,]+)/);
+    var amt = amtMatch ? parseInt(amtMatch[1].replace(/,/g, '')) : 0;
+    if (amt === 0) { addBotMsg('What amount are you filtering by?'); return; }
+    var field = 'pledge';
+    if (/score/.test(lower)) field = 'score';
+    else if (/lifetime|giving|total/.test(lower)) field = 'lifetime';
+    else if (/home|property|value/.test(lower)) field = 'homeValue';
+    else if (/salary|income/.test(lower)) field = 'salary';
+    var filtered = prospects.filter(function(p) { return (p[field] || 0) >= amt; }).sort(function(a, b) { return (b[field] || 0) - (a[field] || 0); });
+    var fieldLabel = { pledge: 'pledge', lifetime: 'lifetime giving', homeValue: 'home value', salary: 'salary', score: 'score' }[field];
+    if (filtered.length === 0) { addBotMsg('No prospects with ' + fieldLabel + ' of ' + (field === 'score' ? amt : fmt$(amt)) + ' or more.'); return; }
+    var list = filtered.slice(0, 8).map(function(p) { return '\u2022 ' + p.firstName + ' ' + p.lastName + ': ' + (field === 'score' ? p[field] : fmt$(p[field])); }).join('\n');
+    addBotMsg(filtered.length + ' prospect' + (filtered.length !== 1 ? 's' : '') + ' with ' + fieldLabel + ' of ' + (field === 'score' ? amt + '+' : fmt$(amt) + '+') + ':\n' + list);
+    return;
+  }
+
+  // === STRATEGY / ADVICE ===
+  if (/\b(strateg|advice|suggest|recommend|what\s*should|next\s*step|approach|prioriti|focus)\b/.test(lower)) {
+    if (prospects.length === 0) { addBotMsg('Import prospects first, then I can give strategic advice.'); return; }
+    var byStage = {};
+    STAGES.forEach(function(st) { byStage[st] = prospects.filter(function(p) { return p.stage === st; }); });
+    var alerts = getAlerts();
+    var msg = 'Strategic Recommendations:\n\n';
+    if (alerts.filter(function(a) { return a.type === 'critical'; }).length > 0) {
+      msg += '1. URGENT: You have ' + alerts.filter(function(a) { return a.type === 'critical'; }).length + ' prospects with no contact in ' + appSettings.alertThresholdCritical + '+ days. These relationships are at risk of going cold. Reach out this week.\n\n';
+    }
+    if (byStage.Solicit.length > 0) {
+      var topSolicit = byStage.Solicit.sort(function(a, b) { return b.score - a.score; })[0];
+      msg += '2. ASK READY: ' + byStage.Solicit.length + ' prospect' + (byStage.Solicit.length !== 1 ? 's' : '') + ' in Solicit stage. Top target: ' + topSolicit.firstName + ' ' + topSolicit.lastName + ' (Score: ' + topSolicit.score + ', Pledge: ' + fmt$(topSolicit.pledge) + '). Schedule the meeting.\n\n';
+    }
+    if (byStage.Cultivate.length > 0) {
+      var stale = byStage.Cultivate.filter(function(p) { return daysSince(p.lastContact) > 60; });
+      if (stale.length > 0) msg += '3. PIPELINE: ' + stale.length + ' Cultivate prospects are overdue (60+ days). Re-engage before they cool off.\n\n';
+      else msg += '3. PIPELINE: Your ' + byStage.Cultivate.length + ' Cultivate prospects are on track. Keep building those relationships.\n\n';
+    }
+    if (byStage.Prospect.length > 0) {
+      msg += '4. NEW LEADS: ' + byStage.Prospect.length + ' prospects need introductions. Focus on high-scorers first.\n\n';
+    }
+    if (byStage.Steward.length > 0) {
+      msg += '5. STEWARDSHIP: Don\'t forget your ' + byStage.Steward.length + ' steward-stage donors. Impact updates and referral asks keep the relationship strong.';
+    }
+    // Revenue opportunity
+    var potentialRev = prospects.filter(function(p) { return p.stage === 'Solicit' || p.stage === 'Cultivate'; }).reduce(function(s, p) { return s + (p.pledge || 0); }, 0);
+    if (potentialRev > 0) msg += '\n\n\uD83D\uDCB0 Pipeline revenue potential: ' + fmt$(potentialRev) + ' in active stages.';
+    addBotMsg(msg.trim());
+    return;
+  }
+
+  // === PROSPECT PROFILE / TELL ME ABOUT ===
+  if (/\b(tell\s*me\s*about|profile|details?\s*(on|for|about)|info\s*(on|about|for)|what\s*do\s*(you|we)\s*know|brief\s*me)\b/.test(lower)) {
+    var nameQ = lower.replace(/tell\s*me\s*about|profile|details?\s*(on|for|about)?|info\s*(on|about|for)?|what\s*do\s*(you|we)\s*know\s*(about)?|brief\s*me\s*(on)?|the|prospect/gi, '').trim();
+    if (nameQ.length < 2) { addBotMsg('Who would you like to know about? Give me a name.'); return; }
+    var match = prospects.find(function(p) { return (p.firstName + ' ' + p.lastName).toLowerCase().indexOf(nameQ) !== -1; });
+    if (!match) { addBotMsg('I couldn\'t find anyone matching "' + nameQ + '".'); return; }
+    var ds = daysSince(match.lastContact);
+    var msg = match.firstName + ' ' + match.lastName + ' \u2014 Full Profile\n\n';
+    msg += 'Occupation: ' + (match.occupation || 'Unknown') + '\n';
+    msg += 'Stage: ' + match.stage + ' | Score: ' + match.score + '/100\n';
+    msg += 'Pledge: ' + fmt$(match.pledge) + ' | Lifetime: ' + fmt$(match.lifetime) + '\n';
+    msg += 'Home Value: ' + fmt$(match.homeValue) + ' | Salary: ' + fmt$(match.salary) + '\n';
+    msg += 'Engagement: ' + (match.engagement || 'unknown') + '\n';
+    msg += 'Last Contact: ' + fmtDate(match.lastContact) + (ds < 999 ? ' (' + ds + ' days ago)' : '') + '\n';
+    if (match.email) msg += 'Email: ' + match.email + '\n';
+    if (match.phone) msg += 'Phone: ' + match.phone + '\n';
+    msg += '\nRecommendation: ' + getRecommendation(match) + '\n';
+    if (match.score >= 70) msg += '\nInsight: High-priority prospect. Their score puts them in the top tier \u2014 invest time here.';
+    else if (match.score >= 40) msg += '\nInsight: Mid-range prospect. Look for ways to deepen engagement and move them up the pipeline.';
+    else msg += '\nInsight: Lower-scoring prospect. May need more research or qualification before heavy investment.';
+    if (ds > 90 && ds < 999) msg += ' WARNING: Contact is overdue (' + ds + ' days).';
+    addBotAction(msg, 'View Full Details \u2192', function() { openProspectDetail(match.id); });
+    return;
+  }
+
+  // === AVERAGE / AGGREGATE ===
+  if (/\b(average|avg|mean|median)\b/.test(lower)) {
+    if (prospects.length === 0) { addBotMsg('No data to analyze yet.'); return; }
+    var avgScore = Math.round(prospects.reduce(function(s, p) { return s + p.score; }, 0) / prospects.length);
+    var avgPledge = Math.round(prospects.reduce(function(s, p) { return s + (p.pledge || 0); }, 0) / prospects.length);
+    var avgLifetime = Math.round(prospects.reduce(function(s, p) { return s + (p.lifetime || 0); }, 0) / prospects.length);
+    var avgDays = prospects.filter(function(p) { return daysSince(p.lastContact) < 999; });
+    var avgContact = avgDays.length > 0 ? Math.round(avgDays.reduce(function(s, p) { return s + daysSince(p.lastContact); }, 0) / avgDays.length) : 'N/A';
+    addBotMsg('Portfolio Averages:\n\n' +
+      '\u2022 Average score: ' + avgScore + '/100\n' +
+      '\u2022 Average pledge: ' + fmt$(avgPledge) + '\n' +
+      '\u2022 Average lifetime giving: ' + fmt$(avgLifetime) + '\n' +
+      '\u2022 Average days since contact: ' + avgContact + (typeof avgContact === 'number' && avgContact > 60 ? ' (concerning \u2014 consider outreach blitz)' : ''));
+    return;
+  }
+
+  // === WHO HAS THE HIGHEST/LOWEST ===
+  if (/\b(who\s*(has|have)\s*(the\s*)?(highest|biggest|largest|most|lowest|smallest|least))\b/.test(lower) || /\b(biggest|largest|highest|most|lowest)\s*(pledge|gift|giving|score|salary|home|value)\b/.test(lower)) {
+    var isLowest = /lowest|smallest|least/.test(lower);
+    var field = 'score';
+    if (/pledge|gift|donation/.test(lower)) field = 'pledge';
+    else if (/lifetime|giving|total/.test(lower)) field = 'lifetime';
+    else if (/home|property|value/.test(lower)) field = 'homeValue';
+    else if (/salary|income/.test(lower)) field = 'salary';
+    var sorted = prospects.slice().sort(function(a, b) { return isLowest ? (a[field] || 0) - (b[field] || 0) : (b[field] || 0) - (a[field] || 0); });
+    var top3 = sorted.slice(0, 3);
+    var label = { score: 'score', pledge: 'pledge', lifetime: 'lifetime giving', homeValue: 'home value', salary: 'salary' }[field];
+    var list = top3.map(function(p, i) { return (i + 1) + '. ' + p.firstName + ' ' + p.lastName + ': ' + (field === 'score' ? p[field] : fmt$(p[field])); }).join('\n');
+    addBotMsg((isLowest ? 'Lowest' : 'Highest') + ' ' + label + ':\n' + list);
+    return;
+  }
+
+  // === PIPELINE DISTRIBUTION ===
+  if (/\b(pipeline|breakdown|distribution|stage)\b/.test(lower) && /\b(breakdown|distribution|how\s*many|show|what)\b/.test(lower)) {
+    var msg = 'Pipeline Distribution:\n\n';
+    var total = prospects.length || 1;
+    STAGES.forEach(function(st) {
+      var sp = prospects.filter(function(p) { return p.stage === st; });
+      var pct = Math.round(sp.length / total * 100);
+      var bar = '';
+      for (var i = 0; i < Math.round(pct / 5); i++) bar += '\u2588';
+      msg += st + ': ' + sp.length + ' (' + pct + '%) ' + bar + '\n';
+      msg += '  Pledged: ' + fmt$(sp.reduce(function(s, p) { return s + (p.pledge || 0); }, 0)) + ' | Avg score: ' + (sp.length ? Math.round(sp.reduce(function(s, p) { return s + p.score; }, 0) / sp.length) : 0) + '\n';
+    });
+    addBotAction(msg, 'View Pipeline \u2192', function() { navigate('pipeline'); });
+    return;
+  }
+
+  // === COUNT / HOW MANY ===
+  if (/how\s*many|total|count/.test(lower)) {
+    var stageMatch = null;
+    STAGES.forEach(function(st) { if (lower.indexOf(st.toLowerCase()) !== -1) stageMatch = st; });
+    if (stageMatch) {
+      var sp = prospects.filter(function(p) { return p.stage === stageMatch; });
+      var msg = sp.length + ' prospect' + (sp.length !== 1 ? 's' : '') + ' in ' + stageMatch + '.';
+      if (sp.length > 0) msg += ' Total pledged: ' + fmt$(sp.reduce(function(s, p) { return s + (p.pledge || 0); }, 0)) + '.';
+      addBotMsg(msg);
+      return;
+    }
+    addBotMsg('You have ' + prospects.length + ' prospects:\n' + STAGES.map(function(st) {
+      return '\u2022 ' + st + ': ' + prospects.filter(function(p) { return p.stage === st; }).length;
+    }).join('\n'));
+    return;
+  }
+
+  // === TOP / BEST / RANK ===
+  if (/\btop\b|best|highest\s*scor|rank/.test(lower)) {
+    var num = 5;
+    var numMatch = lower.match(/\d+/);
+    if (numMatch) num = Math.min(parseInt(numMatch[0]), 20);
+    var sorted = prospects.slice().sort(function(a, b) { return b.score - a.score; }).slice(0, num);
+    if (sorted.length === 0) { addBotMsg('No prospects yet.'); return; }
+    var list = sorted.map(function(p, i) { return (i + 1) + '. ' + p.firstName + ' ' + p.lastName + ' (Score: ' + p.score + ', ' + p.stage + ', Pledge: ' + fmt$(p.pledge) + ')'; }).join('\n');
+    addBotAction('Top ' + sorted.length + ':\n' + list, 'View Rankings \u2192', function() { navigate('top'); });
+    return;
+  }
+
+  // === FOLLOW-UP / OVERDUE / ALERTS ===
+  if (/follow.?up|overdue|alert|attention|need|urgent|critical|stale|cold|risk/.test(lower)) {
+    var alerts = getAlerts();
+    if (alerts.length === 0) { addBotMsg('All clear! Everyone is within your contact thresholds. Nice work!'); return; }
+    var critical = alerts.filter(function(a) { return a.type === 'critical'; });
+    var warning = alerts.filter(function(a) { return a.type === 'warning'; });
+    var info = alerts.filter(function(a) { return a.type === 'info'; });
+    var msg = alerts.length + ' action items:\n\n';
+    if (critical.length) {
+      msg += 'CRITICAL (' + critical.length + '):\n';
+      critical.slice(0, 3).forEach(function(a) { msg += '\u2022 ' + a.prospect.firstName + ' ' + a.prospect.lastName + ' \u2014 ' + a.msg + '\n'; });
+      if (critical.length > 3) msg += '  ...and ' + (critical.length - 3) + ' more\n';
+      msg += '\n';
+    }
+    if (warning.length) {
+      msg += 'WARNINGS (' + warning.length + '):\n';
+      warning.slice(0, 3).forEach(function(a) { msg += '\u2022 ' + a.prospect.firstName + ' ' + a.prospect.lastName + ' \u2014 ' + a.msg + '\n'; });
+      if (warning.length > 3) msg += '  ...and ' + (warning.length - 3) + ' more\n';
+      msg += '\n';
+    }
+    if (info.length) {
+      msg += 'OPPORTUNITIES (' + info.length + '):\n';
+      info.slice(0, 2).forEach(function(a) { msg += '\u2022 ' + a.prospect.firstName + ' ' + a.prospect.lastName + ' \u2014 ' + a.msg + '\n'; });
+    }
+    addBotAction(msg.trim(), 'View Dashboard \u2192', function() { navigate('dashboard'); });
+    return;
+  }
+
+  // === FIND / SEARCH ===
+  if (/find|search|look\s*up|where\s*is|who\s*is|locate/.test(lower)) {
+    var searchQ = lower.replace(/find|search|look\s*up|where\s*is|who\s*is|locate|for|me|the|a|prospect|person|donor/gi, '').trim();
+    if (searchQ.length < 2) { addBotMsg('Who are you looking for? Give me a name or occupation.'); return; }
+    var matches = prospects.filter(function(p) {
+      return (p.firstName + ' ' + p.lastName + ' ' + (p.occupation || '') + ' ' + (p.email || '')).toLowerCase().indexOf(searchQ) !== -1;
+    });
+    if (matches.length === 0) { addBotMsg('No prospects matching "' + searchQ + '". Try a different name or occupation.'); return; }
+    if (matches.length === 1) {
+      var m = matches[0];
+      var ds = daysSince(m.lastContact);
+      addBotAction(m.firstName + ' ' + m.lastName + '\nScore: ' + m.score + ' | Stage: ' + m.stage + ' | Pledge: ' + fmt$(m.pledge) + '\nLast contact: ' + (ds < 999 ? ds + ' days ago' : 'unknown') + '\nRecommendation: ' + getRecommendation(m),
+        'View Details \u2192', function() { openProspectDetail(m.id); });
+    } else {
+      var list = matches.slice(0, 8).map(function(p) { return '\u2022 ' + p.firstName + ' ' + p.lastName + ' (' + p.score + ', ' + p.stage + ', ' + (p.occupation || 'N/A') + ')'; }).join('\n');
+      addBotMsg('Found ' + matches.length + ' match' + (matches.length !== 1 ? 'es' : '') + ':\n' + list);
+    }
+    return;
+  }
+
+  // === MOVE / ADVANCE ===
+  if (/move|advance|promote|change\s*stage/.test(lower)) {
+    var nameStr = lower.replace(/move|advance|promote|change\s*stage|to|the|stage|please/gi, '').trim();
+    var targetStage = null;
+    STAGES.forEach(function(st) { if (nameStr.indexOf(st.toLowerCase()) !== -1) { targetStage = st; nameStr = nameStr.replace(st.toLowerCase(), '').trim(); } });
+    if (!nameStr) { addBotMsg('Which prospect? Try: "Move John Smith to Solicit"'); return; }
+    var found = prospects.find(function(p) { return (p.firstName + ' ' + p.lastName).toLowerCase().indexOf(nameStr) !== -1; });
+    if (!found) { addBotMsg('I couldn\'t find "' + nameStr + '".'); return; }
+    if (targetStage) {
+      found.stage = targetStage; scoreProspect(found); render(); updateAlertBadge();
+      addBotMsg('Done! Moved ' + found.firstName + ' ' + found.lastName + ' to ' + targetStage + '. ' + getRecommendation(found));
+    } else {
+      var idx = STAGES.indexOf(found.stage);
+      if (idx < STAGES.length - 1) {
+        found.stage = STAGES[idx + 1]; render(); updateAlertBadge();
+        addBotMsg('Advanced ' + found.firstName + ' to ' + found.stage + '. Next action: ' + getRecommendation(found));
+      } else { addBotMsg(found.firstName + ' is already at Steward (final stage). Focus on impact updates and referral asks.'); }
+    }
+    return;
+  }
+
+  // === DRAFT OUTREACH ===
+  if (/\b(draft|write|compose|create)\s*(an?\s*)?(email|phone|linkedin|outreach|message|script)\b/.test(lower) || /\b(email|call|message)\s*(draft|template)?\s*(for|to|about)\b/.test(lower)) {
+    var channel = 'Email';
+    if (/phone|call|script/.test(lower)) channel = 'Phone';
+    else if (/linkedin/.test(lower)) channel = 'LinkedIn';
+    var nameQ = lower.replace(/draft|write|compose|create|an?|email|phone|linkedin|outreach|message|script|call|template|for|to|about/gi, '').trim();
+    if (nameQ.length < 2) { addBotMsg('Who should I draft outreach for? Try: "Draft email for John Smith"'); return; }
+    var match = prospects.find(function(p) { return (p.firstName + ' ' + p.lastName).toLowerCase().indexOf(nameQ) !== -1; });
+    if (!match) { addBotMsg('I couldn\'t find "' + nameQ + '". Try a different name.'); return; }
+    var text = generateOutreach(match, channel);
+    addBotAction(channel + ' draft for ' + match.firstName + ' ' + match.lastName + ' (' + match.stage + '):\n\n' + text.substring(0, 300) + '...', 'Copy Full Draft', function() { copyText(text); });
+    return;
+  }
+
+  // === STATS / SUMMARY ===
+  if (/stats|summary|overview|portfolio|pledged|giving|snapshot/.test(lower)) {
+    var totalPledged = prospects.reduce(function(s, p) { return s + (p.pledge || 0); }, 0);
+    var totalLifetime = prospects.reduce(function(s, p) { return s + (p.lifetime || 0); }, 0);
+    var avgScore = Math.round(prospects.reduce(function(s, p) { return s + p.score; }, 0) / prospects.length);
+    var topScorer = prospects.slice().sort(function(a, b) { return b.score - a.score; })[0];
+    var msg = 'Portfolio Snapshot:\n\n';
+    msg += '\u2022 ' + prospects.length + ' prospects\n';
+    msg += '\u2022 ' + fmt$(totalPledged) + ' total pledged\n';
+    msg += '\u2022 ' + fmt$(totalLifetime) + ' lifetime giving\n';
+    msg += '\u2022 Average score: ' + avgScore + '/100\n';
+    msg += '\u2022 Top prospect: ' + topScorer.firstName + ' ' + topScorer.lastName + ' (' + topScorer.score + ')\n\n';
+    var overdue = prospects.filter(function(p) { return daysSince(p.lastContact) > 90; }).length;
+    if (overdue > 0) msg += '\u26A0 ' + overdue + ' prospect' + (overdue !== 1 ? 's' : '') + ' overdue for contact.\n';
+    var highEngagement = prospects.filter(function(p) { return p.engagement === 'high'; }).length;
+    msg += '\u2705 ' + highEngagement + ' high-engagement prospects.';
+    addBotMsg(msg);
+    return;
+  }
+
+  // === IMPORT / ADD ===
+  if (/import|upload/.test(lower)) { addBotAction('Ready to import data!', 'Open Import \u2192', function() { window.showImportModal(); }); return; }
+  if (/add\s*(a\s*)?(new\s*)?prospect|new\s*prospect|create\s*prospect/.test(lower)) { addBotAction('Let\'s add a new prospect.', 'Open Add Form \u2192', function() { window.showAddProspectModal(); }); return; }
+
+  // === EXPORT ===
+  if (/export|download|report|excel|spreadsheet/.test(lower)) { addBotAction('I\'ll generate a full multi-sheet Excel report.', 'Export Report \u2192', function() { window.exportFullReport(); }); return; }
+
+  // === ENGAGEMENT ANALYSIS ===
+  if (/engag|interest|involved|active|inactive|cold/.test(lower)) {
+    var high = prospects.filter(function(p) { return p.engagement === 'high'; });
+    var med = prospects.filter(function(p) { return p.engagement === 'medium'; });
+    var low = prospects.filter(function(p) { return p.engagement === 'low'; });
+    var unk = prospects.filter(function(p) { return !p.engagement || p.engagement === 'unknown'; });
+    var msg = 'Engagement Breakdown:\n\n';
+    msg += '\u2022 High engagement: ' + high.length + (high.length > 0 ? ' \u2014 ' + high.slice(0, 3).map(function(p) { return p.firstName; }).join(', ') : '') + '\n';
+    msg += '\u2022 Medium: ' + med.length + '\n';
+    msg += '\u2022 Low: ' + low.length + (low.length > 0 ? ' \u2014 consider re-engagement campaign' : '') + '\n';
+    msg += '\u2022 Unknown: ' + unk.length + (unk.length > 0 ? ' \u2014 update these profiles' : '') + '\n\n';
+    if (low.length > 0 || unk.length > 0) msg += 'Tip: Low/unknown engagement prospects drag down your portfolio. Consider a targeted outreach campaign or qualifying call.';
+    else msg += 'Your engagement data looks solid!';
+    addBotMsg(msg);
+    return;
+  }
+
+  // === WEALTH ANALYSIS ===
+  if (/wealth|rich|high.?net.?worth|afflu|capacity|major\s*gift/.test(lower)) {
+    var wealthy = prospects.slice().sort(function(a, b) { return ((b.homeValue || 0) + (b.salary || 0)) - ((a.homeValue || 0) + (a.salary || 0)); }).slice(0, 5);
+    if (wealthy.length === 0) { addBotMsg('No wealth data available.'); return; }
+    var msg = 'Top Wealth Signals:\n\n';
+    wealthy.forEach(function(p, i) {
+      msg += (i + 1) + '. ' + p.firstName + ' ' + p.lastName + '\n';
+      msg += '   Home: ' + fmt$(p.homeValue) + ' | Salary: ' + fmt$(p.salary) + ' | Pledge: ' + fmt$(p.pledge) + '\n';
+    });
+    msg += '\nThese prospects have the highest capacity indicators. Consider them for major gift conversations.';
+    addBotMsg(msg);
+    return;
+  }
+
+  // === WHAT SHOULD I DO TODAY ===
+  if (/\b(today|this\s*week|what.*do|action\s*plan|to.?do|priorities|priority)\b/.test(lower)) {
+    var msg = 'Your Priority Actions:\n\n';
+    var actionNum = 1;
+    var crit = prospects.filter(function(p) { return daysSince(p.lastContact) >= appSettings.alertThresholdCritical; }).sort(function(a, b) { return b.score - a.score; });
+    if (crit.length > 0) { msg += actionNum++ + '. CONTACT NOW: ' + crit[0].firstName + ' ' + crit[0].lastName + ' (' + daysSince(crit[0].lastContact) + ' days silent, Score: ' + crit[0].score + ')\n'; }
+    var solicits = prospects.filter(function(p) { return p.stage === 'Solicit'; }).sort(function(a, b) { return b.pledge - a.pledge; });
+    if (solicits.length > 0) { msg += actionNum++ + '. SCHEDULE ASK: ' + solicits[0].firstName + ' ' + solicits[0].lastName + ' for ' + fmt$(solicits[0].pledge) + '\n'; }
+    var cultOverdue = prospects.filter(function(p) { return p.stage === 'Cultivate' && daysSince(p.lastContact) > 60; }).sort(function(a, b) { return b.score - a.score; });
+    if (cultOverdue.length > 0) { msg += actionNum++ + '. RE-ENGAGE: ' + cultOverdue[0].firstName + ' ' + cultOverdue[0].lastName + ' (Cultivate, ' + daysSince(cultOverdue[0].lastContact) + ' days)\n'; }
+    var newProspects = prospects.filter(function(p) { return p.stage === 'Prospect'; }).sort(function(a, b) { return b.score - a.score; });
+    if (newProspects.length > 0) { msg += actionNum++ + '. INTRODUCE: ' + newProspects[0].firstName + ' ' + newProspects[0].lastName + ' (highest-scoring new prospect)\n'; }
+    var stewOverdue = prospects.filter(function(p) { return p.stage === 'Steward' && daysSince(p.lastContact) > 90; });
+    if (stewOverdue.length > 0) { msg += actionNum++ + '. THANK: Send impact update to ' + stewOverdue.length + ' steward prospect' + (stewOverdue.length !== 1 ? 's' : '') + '\n'; }
+    if (actionNum === 1) msg += 'Everything looks great! Your pipeline is healthy and contacts are up to date.';
+    addBotMsg(msg.trim());
+    return;
+  }
+
+  // === THEME ===
+  if (/\b(theme|color|rebrand|brand)\b/.test(lower)) {
+    addBotAction('You can customize the app colors in Settings.', 'Open Settings \u2192', function() { navigate('appsettings'); });
+    return;
+  }
+
+  // === HELP ===
+  if (/help|what\s*can|commands|how\s*do|options|features/.test(lower)) {
+    addBotMsg("Here's what I can do:\n\n" +
+      "Navigate: \"Go to pipeline\", \"Open outreach\"\n" +
+      "Search: \"Find John Smith\", \"Search CEO\"\n" +
+      "Analyze: \"Show stats\", \"Average pledge\", \"Wealth analysis\"\n" +
+      "Filter: \"Prospects over $50K pledge\", \"Score above 70\"\n" +
+      "Compare: \"Compare John vs Jane\"\n" +
+      "Draft: \"Draft email for Jane Doe\"\n" +
+      "Manage: \"Move Jane to Solicit\", \"Advance John\"\n" +
+      "Strategy: \"What should I do today?\", \"Give me advice\"\n" +
+      "Reports: \"Export report\", \"Pipeline breakdown\"\n" +
+      "Profile: \"Update my profile\", \"Set up personalization\"\n" +
+      "Engage: \"Who needs follow-up?\", \"Engagement analysis\"", [
+      'What should I do today?',
+      'Show stats',
+      'Who needs follow-up?',
+      'Wealth analysis',
+      'Set up my profile'
+    ]);
+    return;
+  }
+
+  // === GREETING ===
+  if (/^(hi|hello|hey|good\s*(morning|afternoon|evening)|what'?s\s*up|yo)\b/.test(lower)) {
+    var greeting = prospects.length > 0 ?
+      'Hey! You have ' + prospects.length + ' prospects loaded. What would you like to work on?' :
+      'Hey! Ready to get started? Import your prospect data or add prospects manually.';
+    addBotMsg(greeting, prospects.length > 0 ? ['What should I do today?', 'Show stats', 'Who needs follow-up?'] : ['Import data', 'Add a prospect', 'Help']);
+    return;
+  }
+
+  // === THANKS ===
+  if (/\b(thanks?|thank\s*you|thx|appreciate|great|perfect|awesome|nice)\b/.test(lower)) {
+    addBotMsg('Happy to help! What else can I do for you?', ['Show stats', 'Who needs follow-up?', 'What should I do today?']);
+    return;
+  }
+
+  // === FALLBACK ===
+  addBotMsg("I didn't quite catch that. Here are some things I understand:", [
+    'What should I do today?',
+    'Show top prospects',
+    'Find a prospect',
+    'Draft email for...',
+    'Pipeline breakdown',
+    'Help'
+  ]);
+}
+
+// ===== INIT =====
+render();
+updateAlertBadge();
+
+})();
+</script>
+</body>
+</html>
