@@ -357,6 +357,36 @@ tr:hover td { background: var(--gray-50); }
 }
 .toggle-switch.on::after { transform: translateX(20px); }
 
+/* Activity log */
+.activity-entry { padding: 12px; background: var(--gray-50); border: 1px solid var(--gray-100); border-radius: 8px; margin-bottom: 8px; }
+.activity-entry .ae-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.activity-type-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+.activity-type-badge.at-call { background: var(--blue-light); color: var(--blue); }
+.activity-type-badge.at-email { background: var(--green-light); color: var(--green); }
+.activity-type-badge.at-meeting { background: var(--purple-light); color: var(--purple); }
+.activity-type-badge.at-note { background: var(--gray-200); color: var(--gray-600); }
+.activity-type-badge.at-gift { background: var(--amber-light); color: var(--amber); }
+.activity-type-badge.at-other { background: var(--gray-100); color: var(--gray-500); }
+.outcome-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+.outcome-badge.ob-positive { background: var(--green-light); color: var(--green); }
+.outcome-badge.ob-neutral { background: var(--gray-200); color: var(--gray-600); }
+.outcome-badge.ob-negative { background: var(--red-light); color: var(--red); }
+.outcome-badge.ob-pending { background: var(--amber-light); color: var(--amber); }
+.log-count-badge { display: inline-block; padding: 1px 6px; border-radius: 8px; font-size: 10px; font-weight: 600; background: var(--blue-light); color: var(--blue); margin-left: 4px; }
+
+/* Filter bar */
+.filter-bar { background: #fff; border: 1px solid var(--gray-200); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+.filter-row { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; }
+.filter-group { display: flex; flex-direction: column; gap: 4px; }
+.filter-group label { font-size: 11px; font-weight: 600; color: var(--gray-500); text-transform: uppercase; letter-spacing: .5px; }
+.filter-checks { display: flex; gap: 8px; flex-wrap: wrap; }
+.filter-check { display: flex; align-items: center; gap: 4px; font-size: 13px; cursor: pointer; }
+.filter-check input[type="checkbox"] { width: auto; margin: 0; }
+.filter-badge { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; background: var(--red); color: #fff; font-size: 10px; font-weight: 700; margin-left: 4px; }
+.next-move-text { font-size: 11px; color: var(--gray-500); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; }
+.next-move-overdue { color: var(--red); font-weight: 600; }
+.kc-next { font-size: 11px; color: var(--gray-500); margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--gray-100); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
 /* Talking point pill */
 .tp-tag {
   display: inline-flex; align-items: center; gap: 4px;
@@ -382,8 +412,8 @@ tr:hover td { background: var(--gray-50); }
     <a href="#" data-page="appsettings"><span class="nav-icon">&#9881;</span> Settings</a>
   </nav>
   <div class="security-badge">
-    <strong>&#128274; Zero Data Storage</strong>
-    All data exists in memory only. Nothing is saved to disk or sent to any server. Close the tab and it's gone.
+    <strong>&#128274; Local-Only Storage</strong>
+    Data auto-saves to your browser. Never sent to any server. Clear anytime from Settings.
   </div>
 </aside>
 
@@ -464,6 +494,103 @@ var appSettings = {
   alertThresholdCritical: 180,
   alertThresholdWarning: 90
 };
+
+// Filter state (session only — not persisted)
+var filters = {
+  stages: [], // empty = all
+  scoreMin: 0,
+  scoreMax: 100,
+  engagements: [], // empty = all
+  contactRange: 'any' // 'any','30','31-90','91-180','180+'
+};
+function resetFilters() {
+  filters.stages = []; filters.scoreMin = 0; filters.scoreMax = 100;
+  filters.engagements = []; filters.contactRange = 'any';
+}
+function activeFilterCount() {
+  var c = 0;
+  if (filters.stages.length > 0) c++;
+  if (filters.scoreMin > 0 || filters.scoreMax < 100) c++;
+  if (filters.engagements.length > 0) c++;
+  if (filters.contactRange !== 'any') c++;
+  return c;
+}
+var filtersOpen = false;
+
+// ===== localStorage PERSISTENCE =====
+var STORAGE_KEY = 'prospectpro_state';
+var saveTimer = null;
+function saveState() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(function() {
+    try {
+      var state = {
+        prospects: prospects.map(function(p) {
+          var copy = {};
+          Object.keys(p).forEach(function(k) { copy[k] = p[k]; });
+          if (p.lastContact instanceof Date) copy.lastContact = p.lastContact.toISOString();
+          if (p.activityLog) copy.activityLog = p.activityLog.map(function(e) {
+            var ec = {}; Object.keys(e).forEach(function(k) { ec[k] = e[k]; }); return ec;
+          });
+          return copy;
+        }),
+        nextId: nextId,
+        profile: profile,
+        weights: weights,
+        customWeights: customWeights,
+        appSettings: appSettings,
+        currentTheme: currentTheme
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch(e) { /* storage full or unavailable — silent */ }
+  }, 300);
+}
+
+function loadState() {
+  try {
+    var raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return false;
+    var state = JSON.parse(raw);
+    if (state.prospects && state.prospects.length > 0) {
+      prospects = state.prospects.map(function(p) {
+        if (p.lastContact && typeof p.lastContact === 'string') p.lastContact = new Date(p.lastContact);
+        if (!p.activityLog) p.activityLog = [];
+        if (!p.nextAction) p.nextAction = '';
+        if (!p.nextActionDate) p.nextActionDate = '';
+        if (!p.targetAskAmount) p.targetAskAmount = 0;
+        if (!p.customData) p.customData = {};
+        return p;
+      });
+      nextId = state.nextId || (Math.max.apply(null, prospects.map(function(p) { return p.id; })) + 1);
+    }
+    if (state.profile) {
+      Object.keys(state.profile).forEach(function(k) { profile[k] = state.profile[k]; });
+      if (!profile.talkingPoints) profile.talkingPoints = [];
+    }
+    if (state.weights) Object.keys(state.weights).forEach(function(k) { weights[k] = state.weights[k]; });
+    if (state.customWeights) customWeights = state.customWeights;
+    if (state.appSettings) Object.keys(state.appSettings).forEach(function(k) { appSettings[k] = state.appSettings[k]; });
+    if (state.currentTheme) currentTheme = state.currentTheme;
+    rescoreAll();
+    return true;
+  } catch(e) { return false; }
+}
+
+function clearSavedData() {
+  if (confirm('Clear ALL saved data? This removes everything from your browser and cannot be undone.')) {
+    localStorage.removeItem(STORAGE_KEY);
+    location.reload();
+  }
+}
+
+// Derive lastContact from activityLog
+function effectiveLastContact(p) {
+  if (p.activityLog && p.activityLog.length > 0) {
+    var sorted = p.activityLog.slice().sort(function(a, b) { return new Date(b.date) - new Date(a.date); });
+    return new Date(sorted[0].date);
+  }
+  return p.lastContact;
+}
 
 function applyTheme(themeId) {
   var theme = THEMES.find(function(t) { return t.id === themeId; }) || THEMES[0];
@@ -577,7 +704,7 @@ function scoreProspect(p) {
   f.salary = Math.min(100, ((p.salary || 0) / 300000) * 100);
   f.pledge = Math.min(100, ((p.pledge || 0) / 100000) * 100);
   f.lifetime = Math.min(100, ((p.lifetime || 0) / 500000) * 100);
-  var ds = daysSince(p.lastContact);
+  var ds = daysSince(effectiveLastContact(p));
   f.recency = Math.max(0, 100 - (ds / 365 * 100));
   var engMap = { high: 100, medium: 60, low: 30, unknown: 20 };
   f.engagement = engMap[(p.engagement || 'unknown').toLowerCase()] || 20;
@@ -640,7 +767,7 @@ function tonePhoneOpen(fn) {
 
 // ===== RECOMMENDATIONS & ALERTS =====
 function getRecommendation(p) {
-  var ds = daysSince(p.lastContact);
+  var ds = daysSince(effectiveLastContact(p));
   if (p.stage === 'Prospect') return 'Schedule introduction meeting';
   if (p.stage === 'Cultivate' && ds > 60) return 'OVERDUE \u2014 Re-engage now';
   if (p.stage === 'Cultivate') return 'Continue relationship building';
@@ -655,11 +782,19 @@ function getAlerts() {
   var critDays = appSettings.alertThresholdCritical;
   var warnDays = appSettings.alertThresholdWarning;
   prospects.forEach(function(p) {
-    var ds = daysSince(p.lastContact);
+    var ds = daysSince(effectiveLastContact(p));
     if (ds >= critDays) alerts.push({ type: 'critical', prospect: p, msg: 'No contact in ' + ds + ' days' });
     else if (ds >= warnDays) alerts.push({ type: 'warning', prospect: p, msg: 'No contact in ' + ds + ' days' });
     if (p.stage === 'Cultivate' && ds >= 60 && ds < warnDays) alerts.push({ type: 'info', prospect: p, msg: 'Ready to advance? ' + ds + ' days since contact' });
     if (p.stage === 'Steward' && ds >= 120 && ds < critDays) alerts.push({ type: 'warning', prospect: p, msg: 'Stewardship overdue \u2014 ' + ds + ' days' });
+    // Next Move overdue alerts
+    if (p.nextAction && p.nextActionDate) {
+      var nad = new Date(p.nextActionDate);
+      if (!isNaN(nad.getTime()) && nad < new Date()) {
+        var daysOver = Math.floor((Date.now() - nad.getTime()) / 86400000);
+        alerts.push({ type: 'warning', prospect: p, msg: 'Next move overdue by ' + daysOver + ' days: ' + p.nextAction });
+      }
+    }
   });
   alerts.sort(function(a, b) {
     var order = { critical: 0, warning: 1, info: 2 };
@@ -669,12 +804,12 @@ function getAlerts() {
 }
 
 function getCriticalCount() {
-  return prospects.filter(function(p) { return daysSince(p.lastContact) >= appSettings.alertThresholdCritical; }).length;
+  return prospects.filter(function(p) { return daysSince(effectiveLastContact(p)) >= appSettings.alertThresholdCritical; }).length;
 }
 
 // ===== OUTREACH TEMPLATES (PERSONALIZED) =====
 function generateOutreach(p, channel) {
-  var ds = daysSince(p.lastContact);
+  var ds = daysSince(effectiveLastContact(p));
   var dsText = ds < 999 ? ds + ' days ago' : 'unknown';
   var fn = p.firstName || 'there';
   var ln = p.lastName || '';
@@ -830,16 +965,115 @@ function renderProspects(ct) {
   si.addEventListener('input', function() { searchTerm = this.value; render(); });
   sb.appendChild(si);
   toolbar.appendChild(sb);
-  toolbar.appendChild(h('div', { style: { display: 'flex', gap: '8px' } }, [
-    h('button', { className: 'btn-outline btn-sm', onClick: showImportModal }, ['\uD83D\uDCE8 Import']),
-    h('button', { className: 'btn-outline btn-sm', onClick: showAddProspectModal }, ['\u2795 Add']),
-    h('button', { className: 'btn-primary btn-sm', onClick: function() { exportProspects(getFilteredProspects()); } }, ['\uD83D\uDCE5 Export'])
-  ]));
+  var rightBtns = h('div', { style: { display: 'flex', gap: '8px' } });
+  // Filter toggle button
+  var fCount = activeFilterCount();
+  var filterBtn = h('button', { className: 'btn-outline btn-sm', onClick: function() { filtersOpen = !filtersOpen; render(); } }, ['\u2630 Filters']);
+  if (fCount > 0) filterBtn.appendChild(h('span', { className: 'filter-badge' }, ['' + fCount]));
+  rightBtns.appendChild(filterBtn);
+  rightBtns.appendChild(h('button', { className: 'btn-outline btn-sm', onClick: showImportModal }, ['\uD83D\uDCE8 Import']));
+  rightBtns.appendChild(h('button', { className: 'btn-outline btn-sm', onClick: showAddProspectModal }, ['\u2795 Add']));
+  rightBtns.appendChild(h('button', { className: 'btn-primary btn-sm', onClick: function() { exportProspects(getFilteredProspects()); } }, ['\uD83D\uDCE5 Export']));
+  toolbar.appendChild(rightBtns);
   ct.appendChild(toolbar);
+
+  // === FILTER BAR ===
+  if (filtersOpen) {
+    var fb = h('div', { className: 'filter-bar' });
+    var fr = h('div', { className: 'filter-row' });
+
+    // Stage filter
+    var fg1 = h('div', { className: 'filter-group' });
+    fg1.appendChild(h('label', {}, ['Stage']));
+    var fc1 = h('div', { className: 'filter-checks' });
+    STAGES.forEach(function(st) {
+      var checked = filters.stages.length === 0 || filters.stages.indexOf(st) !== -1;
+      var lbl = h('label', { className: 'filter-check' });
+      var cb = h('input', { type: 'checkbox' });
+      cb.checked = checked;
+      cb.addEventListener('change', function() {
+        if (this.checked) {
+          if (filters.stages.length > 0) filters.stages.push(st);
+        } else {
+          if (filters.stages.length === 0) { filters.stages = STAGES.filter(function(s) { return s !== st; }); }
+          else { filters.stages = filters.stages.filter(function(s) { return s !== st; }); }
+        }
+        if (filters.stages.length === STAGES.length) filters.stages = [];
+        render();
+      });
+      lbl.appendChild(cb);
+      lbl.appendChild(document.createTextNode(' ' + st));
+      fc1.appendChild(lbl);
+    });
+    fg1.appendChild(fc1);
+    fr.appendChild(fg1);
+
+    // Score range
+    var fg2 = h('div', { className: 'filter-group' });
+    fg2.appendChild(h('label', {}, ['Score Range']));
+    var scoreRow = h('div', { style: { display: 'flex', gap: '4px', alignItems: 'center' } });
+    var sMin = h('input', { type: 'number', min: '0', max: '100', value: '' + filters.scoreMin, style: { width: '60px', minWidth: '60px' } });
+    sMin.addEventListener('change', function() { filters.scoreMin = parseInt(this.value) || 0; render(); });
+    var sMax = h('input', { type: 'number', min: '0', max: '100', value: '' + filters.scoreMax, style: { width: '60px', minWidth: '60px' } });
+    sMax.addEventListener('change', function() { filters.scoreMax = parseInt(this.value) || 100; render(); });
+    scoreRow.appendChild(sMin);
+    scoreRow.appendChild(document.createTextNode('\u2013'));
+    scoreRow.appendChild(sMax);
+    fg2.appendChild(scoreRow);
+    fr.appendChild(fg2);
+
+    // Engagement filter
+    var fg3 = h('div', { className: 'filter-group' });
+    fg3.appendChild(h('label', {}, ['Engagement']));
+    var fc3 = h('div', { className: 'filter-checks' });
+    ['high','medium','low','unknown'].forEach(function(eng) {
+      var checked = filters.engagements.length === 0 || filters.engagements.indexOf(eng) !== -1;
+      var lbl = h('label', { className: 'filter-check' });
+      var cb = h('input', { type: 'checkbox' });
+      cb.checked = checked;
+      cb.addEventListener('change', function() {
+        var allEngs = ['high','medium','low','unknown'];
+        if (this.checked) {
+          if (filters.engagements.length > 0) filters.engagements.push(eng);
+        } else {
+          if (filters.engagements.length === 0) { filters.engagements = allEngs.filter(function(e) { return e !== eng; }); }
+          else { filters.engagements = filters.engagements.filter(function(e) { return e !== eng; }); }
+        }
+        if (filters.engagements.length === allEngs.length) filters.engagements = [];
+        render();
+      });
+      lbl.appendChild(cb);
+      lbl.appendChild(document.createTextNode(' ' + eng.charAt(0).toUpperCase() + eng.slice(1)));
+      fc3.appendChild(lbl);
+    });
+    fg3.appendChild(fc3);
+    fr.appendChild(fg3);
+
+    // Contact recency filter
+    var fg4 = h('div', { className: 'filter-group' });
+    fg4.appendChild(h('label', {}, ['Last Contact']));
+    var cSel = h('select', { style: { minWidth: '140px' } });
+    [['any','Any'],['30','Within 30 days'],['31-90','31\u201390 days'],['91-180','91\u2013180 days'],['180+','180+ days overdue']].forEach(function(o) {
+      var opt = h('option', { value: o[0] }, [o[1]]);
+      if (filters.contactRange === o[0]) opt.selected = true;
+      cSel.appendChild(opt);
+    });
+    cSel.addEventListener('change', function() { filters.contactRange = this.value; render(); });
+    fg4.appendChild(cSel);
+    fr.appendChild(fg4);
+
+    fb.appendChild(fr);
+    if (fCount > 0) {
+      fb.appendChild(h('div', { style: { marginTop: '8px' } }, [
+        h('a', { href: '#', style: { fontSize: '12px' }, onClick: function(e) { e.preventDefault(); resetFilters(); render(); } }, ['Clear Filters'])
+      ]));
+    }
+    ct.appendChild(fb);
+  }
 
   var filtered = getFilteredProspects();
   if (filtered.length === 0) {
-    ct.appendChild(h('div', { className: 'card text-muted', style: { textAlign: 'center', padding: '40px' } }, [prospects.length === 0 ? 'No prospects yet. Import or add prospects to begin.' : 'No prospects match your search.']));
+    ct.appendChild(h('div', { className: 'card text-muted', style: { textAlign: 'center', padding: '40px' } }, [prospects.length === 0 ? 'No prospects yet. Import or add prospects to begin.' : 'No prospects match your search or filters.']));
     return;
   }
 
@@ -849,7 +1083,7 @@ function renderProspects(ct) {
   var hr = h('tr');
   var cols = [
     {k:'score',l:'Score',w:'70px'},{k:'lastName',l:'Name'},{k:'occupation',l:'Occupation'},{k:'stage',l:'Stage'},
-    {k:'pledge',l:'Pledge',a:'right'},{k:'lifetime',l:'Lifetime',a:'right'},{k:'lastContact',l:'Last Contact'},{k:'recommendation',l:'Action'}
+    {k:'pledge',l:'Pledge',a:'right'},{k:'lifetime',l:'Lifetime',a:'right'},{k:'lastContact',l:'Last Contact'},{k:'recommendation',l:'Action'},{k:'nextAction',l:'Next Move'}
   ];
   cols.forEach(function(c) {
     var th = h('th', { style: c.w ? { width: c.w } : {} });
@@ -867,21 +1101,46 @@ function renderProspects(ct) {
 
   var tbody = h('tbody');
   filtered.forEach(function(p) {
-    var ds = daysSince(p.lastContact);
+    var elc = effectiveLastContact(p);
+    var ds = daysSince(elc);
     var rec = getRecommendation(p);
     var contactEl = h('td');
-    contactEl.appendChild(h('div', {}, [fmtDate(p.lastContact)]));
+    contactEl.appendChild(h('div', {}, [fmtDate(elc)]));
     if (ds < 999) contactEl.appendChild(h('div', { className: 'text-sm', style: ds > 90 ? { color: 'var(--red)', fontWeight: '600' } : { color: 'var(--gray-500)' } }, [ds + ' days ago']));
+
+    // Name cell with activity count
+    var nameCell = h('td', { style: { fontWeight: '600' } });
+    nameCell.appendChild(document.createTextNode((p.firstName + ' ' + p.lastName).trim()));
+    if (p.activityLog && p.activityLog.length > 0) {
+      nameCell.appendChild(h('span', { className: 'log-count-badge' }, [p.activityLog.length + ' logged']));
+    }
+
+    // Next Move cell
+    var nmCell = h('td');
+    if (p.nextAction) {
+      nmCell.appendChild(h('div', { className: 'next-move-text' }, [p.nextAction]));
+      if (p.nextActionDate) {
+        var nad = new Date(p.nextActionDate);
+        if (!isNaN(nad.getTime())) {
+          var daysUntil = Math.ceil((nad.getTime() - Date.now()) / 86400000);
+          var relText = daysUntil > 0 ? 'in ' + daysUntil + ' day' + (daysUntil !== 1 ? 's' : '') : Math.abs(daysUntil) + ' day' + (Math.abs(daysUntil) !== 1 ? 's' : '') + ' ago';
+          nmCell.appendChild(h('div', { className: 'text-sm ' + (daysUntil < 0 ? 'next-move-overdue' : 'text-muted') }, [relText]));
+        }
+      }
+    } else {
+      nmCell.appendChild(h('span', { className: 'text-muted text-sm' }, ['\u2014']));
+    }
 
     var tr = h('tr', { style: { cursor: 'pointer' }, onClick: function() { openProspectDetail(p.id); } }, [
       h('td', {}, [h('span', { className: 'score-badge score-badge-sm ' + scoreClass(p.score) }, ['' + p.score])]),
-      h('td', { style: { fontWeight: '600' } }, [(p.firstName + ' ' + p.lastName).trim()]),
+      nameCell,
       h('td', { className: 'text-muted', style: { maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } }, [p.occupation || '\u2014']),
       h('td', {}, [h('span', { className: 'stage-badge ' + stageClass(p.stage) }, [p.stage])]),
       h('td', { style: { textAlign: 'right', fontWeight: '600' } }, [fmt$(p.pledge)]),
       h('td', { style: { textAlign: 'right' } }, [fmt$(p.lifetime)]),
       contactEl,
-      h('td', { style: rec.indexOf('OVERDUE') !== -1 ? { color: 'var(--red)', fontWeight: '600', fontSize: '12px' } : { fontSize: '12px', color: 'var(--gray-600)' } }, [rec])
+      h('td', { style: rec.indexOf('OVERDUE') !== -1 ? { color: 'var(--red)', fontWeight: '600', fontSize: '12px' } : { fontSize: '12px', color: 'var(--gray-600)' } }, [rec]),
+      nmCell
     ]);
     tbody.appendChild(tr);
   });
@@ -899,10 +1158,25 @@ function getFilteredProspects() {
       return (p.firstName + ' ' + p.lastName + ' ' + (p.occupation || '') + ' ' + (p.email || '') + ' ' + (p.stage || '')).toLowerCase().indexOf(term) !== -1;
     });
   }
+  // Apply filters
+  if (filters.stages.length > 0) list = list.filter(function(p) { return filters.stages.indexOf(p.stage) !== -1; });
+  if (filters.scoreMin > 0 || filters.scoreMax < 100) list = list.filter(function(p) { return p.score >= filters.scoreMin && p.score <= filters.scoreMax; });
+  if (filters.engagements.length > 0) list = list.filter(function(p) { return filters.engagements.indexOf(p.engagement || 'unknown') !== -1; });
+  if (filters.contactRange !== 'any') {
+    list = list.filter(function(p) {
+      var ds = daysSince(effectiveLastContact(p));
+      if (filters.contactRange === '30') return ds <= 30;
+      if (filters.contactRange === '31-90') return ds >= 31 && ds <= 90;
+      if (filters.contactRange === '91-180') return ds >= 91 && ds <= 180;
+      if (filters.contactRange === '180+') return ds > 180;
+      return true;
+    });
+  }
   list.sort(function(a, b) {
     var va = a[sortCol], vb = b[sortCol];
     if (sortCol === 'recommendation') { va = getRecommendation(a); vb = getRecommendation(b); }
     if (sortCol === 'lastName') { va = (a.firstName + ' ' + a.lastName).toLowerCase(); vb = (b.firstName + ' ' + b.lastName).toLowerCase(); }
+    if (sortCol === 'lastContact') { va = effectiveLastContact(a); vb = effectiveLastContact(b); va = va ? va.getTime() : 0; vb = vb ? vb.getTime() : 0; }
     if (va == null) va = '';
     if (vb == null) vb = '';
     if (typeof va === 'string') return va.localeCompare(vb) * sortDir;
@@ -927,15 +1201,20 @@ function renderPipeline(ct) {
       if (idx > 0) actions.appendChild(h('button', { className: 'btn-outline btn-sm', onClick: function(e) { e.stopPropagation(); moveStage(p, -1); } }, ['\u25C0 ' + STAGES[idx - 1]]));
       if (idx < STAGES.length - 1) actions.appendChild(h('button', { className: 'btn-primary btn-sm', onClick: function(e) { e.stopPropagation(); moveStage(p, 1); } }, [STAGES[idx + 1] + ' \u25B6']));
 
-      col.appendChild(h('div', { className: 'kanban-card', onClick: function(e) { if (e.target.tagName !== 'BUTTON') openProspectDetail(p.id); } }, [
+      var kcChildren = [
         h('div', { className: 'kc-name' }, [(p.firstName + ' ' + p.lastName).trim()]),
         h('div', { className: 'kc-occ' }, [p.occupation || '\u2014']),
         h('div', { className: 'kc-row' }, [
           h('span', { className: 'kc-pledge' }, [p.pledge ? fmt$(p.pledge) : '']),
-          h('span', { className: 'score-badge score-badge-sm ' + scoreClass(p.score) }, ['' + p.score])
+          h('span', { style: { display: 'flex', alignItems: 'center', gap: '4px' } }, [
+            p.activityLog && p.activityLog.length > 0 ? h('span', { className: 'log-count-badge' }, ['' + p.activityLog.length]) : null,
+            h('span', { className: 'score-badge score-badge-sm ' + scoreClass(p.score) }, ['' + p.score])
+          ])
         ]),
         actions
-      ]));
+      ];
+      if (p.nextAction) kcChildren.push(h('div', { className: 'kc-next' }, ['\u2794 ' + p.nextAction]));
+      col.appendChild(h('div', { className: 'kanban-card', onClick: function(e) { if (e.target.tagName !== 'BUTTON') openProspectDetail(p.id); } }, kcChildren));
     });
     if (sp.length === 0) col.appendChild(h('div', { className: 'text-muted text-sm', style: { textAlign: 'center', padding: '24px 0' } }, ['No prospects']));
     kanban.appendChild(col);
@@ -948,7 +1227,7 @@ function moveStage(p, dir) {
   if (idx >= 0 && idx < STAGES.length) {
     p.stage = STAGES[idx];
     toast(p.firstName + ' moved to ' + p.stage);
-    render(); updateAlertBadge();
+    saveState(); render(); updateAlertBadge();
   }
 }
 
@@ -979,7 +1258,7 @@ function renderTopProspects(ct) {
     tbl.appendChild(h('thead', {}, [thr]));
     var tb = h('tbody');
     sorted.forEach(function(p, i) {
-      var ds = daysSince(p.lastContact);
+      var ds = daysSince(effectiveLastContact(p));
       var rec = getRecommendation(p);
       var wealth = h('td');
       if (p.homeValue) wealth.appendChild(h('div', { className: 'text-sm' }, ['\uD83C\uDFE0 ' + fmt$(p.homeValue)]));
@@ -1141,7 +1420,7 @@ function renderSettings(ct) {
       h('button', { className: 'btn-outline btn-sm', onClick: function() {
         customWeights = [];
         Object.keys(defaultWeights).forEach(function(k) { weights[k] = defaultWeights[k]; });
-        rescoreAll(); render(); toast('Weights reset to default');
+        rescoreAll(); saveState(); render(); toast('Weights reset to default');
       } }, ['Reset Defaults']),
       h('button', { className: 'btn-primary btn-sm', onClick: function() { showAddWeightModal(); } }, ['\u2795 Add Factor'])
     ])
@@ -1226,7 +1505,7 @@ function renderSettings(ct) {
       else weights[fac.k] = newVal;
       currentVal = newVal;
       valSpan.textContent = '' + newVal;
-      rescoreAll();
+      rescoreAll(); saveState();
       updatePctBar();
     });
     row.appendChild(slider);
@@ -1237,7 +1516,7 @@ function renderSettings(ct) {
         if (confirm('Remove "' + fac.l + '" from scoring?')) {
           var idx = customWeights.indexOf(fac.cw);
           if (idx !== -1) customWeights.splice(idx, 1);
-          rescoreAll(); render(); toast('Removed ' + fac.l);
+          rescoreAll(); saveState(); render(); toast('Removed ' + fac.l);
         }
       } }, ['\u2715']));
     }
@@ -1266,12 +1545,15 @@ function renderSettings(ct) {
   // Privacy / Clear
   var dz = h('div', { className: 'card' });
   dz.appendChild(h('div', { className: 'card-header' }, [h('h2', {}, ['Data & Privacy'])]));
-  dz.appendChild(h('p', { className: 'text-sm text-muted mb-16' }, ['ProspectPro uses zero data storage. All prospect data exists only in your browser\'s memory. No data is saved to disk, sent to servers, or stored in cookies. When you close or refresh this tab, all data is permanently erased.']));
-  dz.appendChild(h('button', { className: 'btn-danger btn-sm', onClick: function() {
-    if (confirm('Are you sure you want to clear ALL prospect data? This cannot be undone.')) {
-      prospects = []; nextId = 1; toast('All data cleared'); render(); updateAlertBadge();
-    }
-  } }, ['\u26A0 Clear All Data']));
+  dz.appendChild(h('p', { className: 'text-sm text-muted mb-16' }, ['ProspectPro saves data to your browser\'s local storage only. No data is sent to any server. You can clear everything at any time.']));
+  dz.appendChild(h('div', { style: { display: 'flex', gap: '8px' } }, [
+    h('button', { className: 'btn-danger btn-sm', onClick: function() {
+      if (confirm('Are you sure you want to clear ALL prospect data? This cannot be undone.')) {
+        prospects = []; nextId = 1; saveState(); toast('All data cleared'); render(); updateAlertBadge();
+      }
+    } }, ['\u26A0 Clear All Data']),
+    h('button', { className: 'btn-outline btn-sm', onClick: clearSavedData }, ['\uD83D\uDDD1 Clear Saved Data & Reload'])
+  ]));
   ct.appendChild(dz);
 }
 
@@ -1316,7 +1598,7 @@ function showAddWeightModal() {
         toast('A factor with that name already exists'); return;
       }
       customWeights.push({ key: key, label: label, weight: w, maxVal: maxVal });
-      rescoreAll(); closeModal();
+      rescoreAll(); saveState(); closeModal();
       toast('Added "' + label + '" (' + w + ' pts)');
       render();
     } }, ['Add Factor'])
@@ -1343,7 +1625,7 @@ function renderAppSettings(ct) {
       var fg = h('div', { className: 'form-group' });
       fg.appendChild(h('label', {}, [f.l]));
       var inp = h('input', { type: 'text', placeholder: f.ph, value: profile[f.k] || '' });
-      inp.addEventListener('change', function() { profile[f.k] = this.value.trim(); });
+      inp.addEventListener('change', function() { profile[f.k] = this.value.trim(); saveState(); });
       pInputs[f.k] = inp;
       fg.appendChild(inp);
       row.appendChild(fg);
@@ -1355,7 +1637,7 @@ function renderAppSettings(ct) {
   var fgMission = h('div', { className: 'form-group' });
   fgMission.appendChild(h('label', {}, ['Organization Mission (brief)']));
   var mInp = h('input', { type: 'text', placeholder: 'e.g., providing education to underserved youth, curing childhood cancer', value: profile.orgMission || '' });
-  mInp.addEventListener('change', function() { profile.orgMission = this.value.trim(); });
+  mInp.addEventListener('change', function() { profile.orgMission = this.value.trim(); saveState(); });
   fgMission.appendChild(mInp);
   profCard.appendChild(fgMission);
 
@@ -1364,7 +1646,7 @@ function renderAppSettings(ct) {
   fgSig.appendChild(h('label', {}, ['Email Signature Block']));
   var sigInp = h('textarea', { rows: '2', placeholder: 'Your Name\nYour Title\n(555) 123-4567 | email@org.com' });
   sigInp.value = profile.signature || '';
-  sigInp.addEventListener('change', function() { profile.signature = this.value.trim(); });
+  sigInp.addEventListener('change', function() { profile.signature = this.value.trim(); saveState(); });
   fgSig.appendChild(sigInp);
   profCard.appendChild(fgSig);
 
@@ -1383,7 +1665,7 @@ function renderAppSettings(ct) {
     if (profile.tone === o.v) opt.selected = true;
     toneSel.appendChild(opt);
   });
-  toneSel.addEventListener('change', function() { profile.tone = this.value; toast('Tone set to ' + this.value); });
+  toneSel.addEventListener('change', function() { profile.tone = this.value; saveState(); toast('Tone set to ' + this.value); });
   fgTone.appendChild(toneSel);
   outCard.appendChild(fgTone);
 
@@ -1392,13 +1674,13 @@ function renderAppSettings(ct) {
   var fgEv = h('div', { className: 'form-group' });
   fgEv.appendChild(h('label', {}, ['Upcoming Event']));
   var evInp = h('input', { type: 'text', placeholder: 'e.g., Annual Gala, Spring Campus Tour, Impact Breakfast', value: profile.upcomingEvent || '' });
-  evInp.addEventListener('change', function() { profile.upcomingEvent = this.value.trim(); });
+  evInp.addEventListener('change', function() { profile.upcomingEvent = this.value.trim(); saveState(); });
   fgEv.appendChild(evInp);
   evRow.appendChild(fgEv);
   var fgEvD = h('div', { className: 'form-group' });
   fgEvD.appendChild(h('label', {}, ['Event Date']));
   var evDInp = h('input', { type: 'text', placeholder: 'e.g., April 15, 2026', value: profile.eventDate || '' });
-  evDInp.addEventListener('change', function() { profile.eventDate = this.value.trim(); });
+  evDInp.addEventListener('change', function() { profile.eventDate = this.value.trim(); saveState(); });
   fgEvD.appendChild(evDInp);
   evRow.appendChild(fgEvD);
   outCard.appendChild(evRow);
@@ -1408,7 +1690,7 @@ function renderAppSettings(ct) {
   fgNews.appendChild(h('label', {}, ['Newsletter / Donor Update']));
   var newsInp = h('textarea', { rows: '2', placeholder: 'e.g., We just broke ground on the new community center! Construction begins this spring.' });
   newsInp.value = profile.newsletterUpdate || '';
-  newsInp.addEventListener('change', function() { profile.newsletterUpdate = this.value.trim(); });
+  newsInp.addEventListener('change', function() { profile.newsletterUpdate = this.value.trim(); saveState(); });
   fgNews.appendChild(newsInp);
   fgNews.appendChild(h('div', { className: 'text-sm text-muted mt-8' }, ['This will be woven into outreach emails and scripts as a timely update.']));
   outCard.appendChild(fgNews);
@@ -1424,7 +1706,7 @@ function renderAppSettings(ct) {
     profile.talkingPoints.forEach(function(tp, i) {
       var tag = h('span', { className: 'tp-tag' }, [
         tp.length > 60 ? tp.slice(0, 60) + '...' : tp,
-        h('span', { className: 'tp-x', onClick: function() { profile.talkingPoints.splice(i, 1); rebuildTpTags(); } }, ['\u00D7'])
+        h('span', { className: 'tp-x', onClick: function() { profile.talkingPoints.splice(i, 1); rebuildTpTags(); saveState(); } }, ['\u00D7'])
       ]);
       tpContainer.appendChild(tag);
     });
@@ -1440,7 +1722,7 @@ function renderAppSettings(ct) {
   tpRow.appendChild(tpInp);
   tpRow.appendChild(h('button', { className: 'btn-primary btn-sm', style: { whiteSpace: 'nowrap' }, onClick: function() {
     var val = tpInp.value.trim();
-    if (val) { profile.talkingPoints.push(val); tpInp.value = ''; rebuildTpTags(); toast('Talking point added'); }
+    if (val) { profile.talkingPoints.push(val); tpInp.value = ''; rebuildTpTags(); saveState(); toast('Talking point added'); }
   } }, ['Add']));
   fgTp.appendChild(tpRow);
   outCard.appendChild(fgTp);
@@ -1457,7 +1739,7 @@ function renderAppSettings(ct) {
       applyTheme(theme.id);
       grid.querySelectorAll('.theme-swatch').forEach(function(s) { s.classList.remove('active'); });
       swatch.classList.add('active');
-      toast('Theme changed to ' + theme.name);
+      saveState(); toast('Theme changed to ' + theme.name);
     } });
     var colors = h('div', { className: 'swatch-colors' });
     colors.appendChild(h('div', { style: { background: theme.sidebar } }));
@@ -1482,7 +1764,7 @@ function renderAppSettings(ct) {
   ]));
   var stageSel = h('select');
   STAGES.forEach(function(st) { var o = h('option', { value: st }, [st]); if (appSettings.defaultStage === st) o.selected = true; stageSel.appendChild(o); });
-  stageSel.addEventListener('change', function() { appSettings.defaultStage = this.value; toast('Default stage: ' + this.value); });
+  stageSel.addEventListener('change', function() { appSettings.defaultStage = this.value; saveState(); toast('Default stage: ' + this.value); });
   row1.appendChild(stageSel);
   genCard.appendChild(row1);
 
@@ -1492,7 +1774,7 @@ function renderAppSettings(ct) {
     h('div', { className: 'sr-desc' }, ['Display score badges on Kanban board cards'])
   ]));
   var tog2 = h('div', { className: 'toggle-switch' + (appSettings.showScoreOnCards ? ' on' : '') });
-  tog2.addEventListener('click', function() { appSettings.showScoreOnCards = !appSettings.showScoreOnCards; tog2.classList.toggle('on'); render(); });
+  tog2.addEventListener('click', function() { appSettings.showScoreOnCards = !appSettings.showScoreOnCards; tog2.classList.toggle('on'); saveState(); render(); });
   row2.appendChild(tog2);
   genCard.appendChild(row2);
 
@@ -1504,7 +1786,7 @@ function renderAppSettings(ct) {
   var tog3 = h('div', { className: 'toggle-switch' + (appSettings.compactTables ? ' on' : '') });
   tog3.addEventListener('click', function() {
     appSettings.compactTables = !appSettings.compactTables;
-    tog3.classList.toggle('on');
+    tog3.classList.toggle('on'); saveState();
   });
   row3.appendChild(tog3);
   genCard.appendChild(row3);
@@ -1515,7 +1797,7 @@ function renderAppSettings(ct) {
     h('div', { className: 'sr-desc' }, ['Days without contact before a prospect is flagged critical'])
   ]));
   var critInput = h('input', { type: 'number', value: '' + appSettings.alertThresholdCritical, min: '30', max: '365', style: { width: '80px', minWidth: '80px' } });
-  critInput.addEventListener('change', function() { appSettings.alertThresholdCritical = parseInt(this.value) || 180; toast('Critical threshold: ' + appSettings.alertThresholdCritical + ' days'); });
+  critInput.addEventListener('change', function() { appSettings.alertThresholdCritical = parseInt(this.value) || 180; saveState(); toast('Critical threshold: ' + appSettings.alertThresholdCritical + ' days'); });
   row4.appendChild(critInput);
   genCard.appendChild(row4);
 
@@ -1525,7 +1807,7 @@ function renderAppSettings(ct) {
     h('div', { className: 'sr-desc' }, ['Days without contact before a prospect gets a warning'])
   ]));
   var warnInput = h('input', { type: 'number', value: '' + appSettings.alertThresholdWarning, min: '14', max: '365', style: { width: '80px', minWidth: '80px' } });
-  warnInput.addEventListener('change', function() { appSettings.alertThresholdWarning = parseInt(this.value) || 90; toast('Warning threshold: ' + appSettings.alertThresholdWarning + ' days'); });
+  warnInput.addEventListener('change', function() { appSettings.alertThresholdWarning = parseInt(this.value) || 90; saveState(); toast('Warning threshold: ' + appSettings.alertThresholdWarning + ' days'); });
   row5.appendChild(warnInput);
   genCard.appendChild(row5);
 
@@ -1538,7 +1820,7 @@ function renderAppSettings(ct) {
     'ProspectPro is a zero-infrastructure fundraising intelligence tool. All data processing happens locally in your browser. ' +
     'No accounts, no servers, no tracking. Built for development officers who need powerful prospect management without IT overhead.'
   ]));
-  aboutCard.appendChild(h('div', { className: 'text-sm text-muted mt-8' }, ['Version 2.0 \u2022 Zero Data Storage \u2022 Single-file deployment']));
+  aboutCard.appendChild(h('div', { className: 'text-sm text-muted mt-8' }, ['Version 3.0 \u2022 Local-only storage \u2022 Single-file deployment']));
   ct.appendChild(aboutCard);
 }
 
@@ -1563,18 +1845,21 @@ function openProspectDetail(id) {
     ]));
 
     var tabs = h('div', { className: 'tabs', style: { padding: '0 24px' } });
-    ['overview','outreach','edit'].forEach(function(t) {
-      tabs.appendChild(h('button', { className: 'tab-btn' + (t === activeTab ? ' active' : ''), onClick: function() { activeTab = t; build(); } }, [t.charAt(0).toUpperCase() + t.slice(1)]));
+    ['overview','activity','outreach','edit'].forEach(function(t) {
+      var label = t.charAt(0).toUpperCase() + t.slice(1);
+      if (t === 'activity' && p.activityLog && p.activityLog.length > 0) label += ' (' + p.activityLog.length + ')';
+      tabs.appendChild(h('button', { className: 'tab-btn' + (t === activeTab ? ' active' : ''), onClick: function() { activeTab = t; build(); } }, [label]));
     });
     modal.appendChild(tabs);
 
     var body = h('div', { className: 'modal-body' });
 
     if (activeTab === 'overview') {
-      var ds = daysSince(p.lastContact);
+      var elc = effectiveLastContact(p);
+      var ds = daysSince(elc);
       var grid = h('div', { className: 'form-row mb-16' });
       var left = h('div');
-      [['Email', p.email],['Phone', p.phone],['Address', p.address],['Last Contact', fmtDate(p.lastContact) + (ds < 999 ? ' (' + ds + ' days ago)' : '')]].forEach(function(r) {
+      [['Email', p.email],['Phone', p.phone],['Address', p.address],['Last Contact', fmtDate(elc) + (ds < 999 ? ' (' + ds + ' days ago)' : '')]].forEach(function(r) {
         left.appendChild(h('div', { className: 'text-sm text-muted' }, [r[0]]));
         left.appendChild(h('div', { style: { fontWeight: '500', marginBottom: '8px' } }, [r[1] || '\u2014']));
       });
@@ -1619,7 +1904,7 @@ function openProspectDetail(id) {
       var sr = h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } });
       STAGES.forEach(function(st) {
         sr.appendChild(h('button', { className: (p.stage === st ? 'btn-primary' : 'btn-outline') + ' btn-sm', onClick: function() {
-          p.stage = st; toast('Moved to ' + st); build(); render(); updateAlertBadge();
+          p.stage = st; toast('Moved to ' + st); saveState(); build(); render(); updateAlertBadge();
         } }, [st]));
       });
       body.appendChild(sr);
@@ -1632,6 +1917,80 @@ function openProspectDetail(id) {
       body.appendChild(h('h3', { style: { margin: '16px 0 8px', fontSize: '14px', fontWeight: '600' } }, ['Recommendation']));
       var rec = getRecommendation(p);
       body.appendChild(h('div', { style: { padding: '12px', borderRadius: '6px', fontWeight: '600', fontSize: '13px', background: rec.indexOf('OVERDUE') !== -1 ? 'var(--red-light)' : 'var(--blue-light)', color: rec.indexOf('OVERDUE') !== -1 ? 'var(--red)' : 'var(--blue)' } }, [rec]));
+
+    } else if (activeTab === 'activity') {
+      // === ACTIVITY LOG TAB ===
+      if (!p.activityLog) p.activityLog = [];
+      // Add entry form
+      var addForm = h('div', { className: 'card', style: { padding: '16px', marginBottom: '16px' } });
+      addForm.appendChild(h('h3', { style: { fontSize: '14px', fontWeight: '600', marginBottom: '12px' } }, ['Log New Activity']));
+      var aInputs = {};
+      var afRow1 = h('div', { className: 'form-row' });
+      var afg1 = h('div', { className: 'form-group' });
+      afg1.appendChild(h('label', {}, ['Type *']));
+      aInputs.type = h('select');
+      ['Call','Email','Meeting','Note','Gift','Other'].forEach(function(t) { aInputs.type.appendChild(h('option', { value: t }, [t])); });
+      afg1.appendChild(aInputs.type);
+      afRow1.appendChild(afg1);
+      var afg2 = h('div', { className: 'form-group' });
+      afg2.appendChild(h('label', {}, ['Date']));
+      aInputs.date = h('input', { type: 'date', value: new Date().toISOString().slice(0, 10) });
+      afg2.appendChild(aInputs.date);
+      afRow1.appendChild(afg2);
+      addForm.appendChild(afRow1);
+      var afg3 = h('div', { className: 'form-group' });
+      afg3.appendChild(h('label', {}, ['Summary *']));
+      aInputs.summary = h('input', { type: 'text', placeholder: 'What happened?' });
+      afg3.appendChild(aInputs.summary);
+      addForm.appendChild(afg3);
+      var afRow2 = h('div', { className: 'form-row' });
+      var afg4 = h('div', { className: 'form-group' });
+      afg4.appendChild(h('label', {}, ['Outcome']));
+      aInputs.outcome = h('select');
+      ['Positive','Neutral','Negative','Pending'].forEach(function(o) { aInputs.outcome.appendChild(h('option', { value: o }, [o])); });
+      afg4.appendChild(aInputs.outcome);
+      afRow2.appendChild(afg4);
+      var afg5 = h('div', { className: 'form-group' });
+      afg5.appendChild(h('label', {}, ['Next Step (optional)']));
+      aInputs.nextStep = h('input', { type: 'text', placeholder: 'e.g., Follow up next Tuesday' });
+      afg5.appendChild(aInputs.nextStep);
+      afRow2.appendChild(afg5);
+      addForm.appendChild(afRow2);
+      addForm.appendChild(h('button', { className: 'btn-primary btn-sm', onClick: function() {
+        var summary = aInputs.summary.value.trim();
+        if (!summary) { toast('Summary is required'); return; }
+        var nextLogId = p.activityLog.length > 0 ? Math.max.apply(null, p.activityLog.map(function(e) { return e.id || 0; })) + 1 : 1;
+        p.activityLog.push({
+          id: nextLogId,
+          date: aInputs.date.value || new Date().toISOString().slice(0, 10),
+          type: aInputs.type.value,
+          summary: summary,
+          outcome: aInputs.outcome.value,
+          nextStep: aInputs.nextStep.value.trim()
+        });
+        scoreProspect(p); saveState();
+        toast('Activity logged');
+        build(); render(); updateAlertBadge();
+      } }, ['\u2795 Log Activity']));
+      body.appendChild(addForm);
+
+      // Activity list
+      if (p.activityLog.length === 0) {
+        body.appendChild(h('div', { className: 'text-muted text-sm', style: { textAlign: 'center', padding: '24px 0' } }, ['No activity logged yet. Use the form above to start tracking interactions.']));
+      } else {
+        var sorted = p.activityLog.slice().sort(function(a, b) { return new Date(b.date) - new Date(a.date); });
+        sorted.forEach(function(entry) {
+          var ae = h('div', { className: 'activity-entry' });
+          var header = h('div', { className: 'ae-header' });
+          header.appendChild(h('span', { className: 'activity-type-badge at-' + entry.type.toLowerCase() }, [entry.type]));
+          header.appendChild(h('span', { className: 'outcome-badge ob-' + entry.outcome.toLowerCase() }, [entry.outcome]));
+          header.appendChild(h('span', { className: 'text-sm text-muted', style: { marginLeft: 'auto' } }, [fmtDate(entry.date)]));
+          ae.appendChild(header);
+          ae.appendChild(h('div', { style: { fontSize: '13px', marginTop: '4px' } }, [entry.summary]));
+          if (entry.nextStep) ae.appendChild(h('div', { className: 'text-sm', style: { marginTop: '4px', color: 'var(--blue)', fontWeight: '500' } }, ['\u2794 Next: ' + entry.nextStep]));
+          body.appendChild(ae);
+        });
+      }
 
     } else if (activeTab === 'outreach') {
       var selCh = 'Email';
@@ -1671,6 +2030,26 @@ function openProspectDetail(id) {
         {k:'stage',l:'Pipeline Stage',t:'select',opts:STAGES},
         {k:'notes',l:'Notes',t:'textarea'}
       ];
+      // Next Move section header
+      body.appendChild(h('h3', { style: { fontSize: '14px', fontWeight: '600', marginBottom: '12px', paddingBottom: '8px', borderBottom: '2px solid var(--gray-200)' } }, ['\u2794 Next Move']));
+      var nmRow1 = h('div', { className: 'form-row' });
+      var nmFg1 = h('div', { className: 'form-group' });
+      nmFg1.appendChild(h('label', {}, ['Next Action']));
+      var nmActionInp = h('input', { type: 'text', placeholder: 'e.g., Schedule lunch, Send proposal', value: p.nextAction || '' });
+      nmFg1.appendChild(nmActionInp);
+      nmRow1.appendChild(nmFg1);
+      var nmFg2 = h('div', { className: 'form-group' });
+      nmFg2.appendChild(h('label', {}, ['Action Date']));
+      var nmDateInp = h('input', { type: 'date', value: p.nextActionDate || '' });
+      nmFg2.appendChild(nmDateInp);
+      nmRow1.appendChild(nmFg2);
+      body.appendChild(nmRow1);
+      var nmFg3 = h('div', { className: 'form-group' });
+      nmFg3.appendChild(h('label', {}, ['Target Ask Amount ($)']));
+      var nmAskInp = h('input', { type: 'number', placeholder: '0', value: p.targetAskAmount || '' });
+      nmFg3.appendChild(nmAskInp);
+      body.appendChild(nmFg3);
+      body.appendChild(h('h3', { style: { fontSize: '14px', fontWeight: '600', marginBottom: '12px', marginTop: '16px', paddingBottom: '8px', borderBottom: '2px solid var(--gray-200)' } }, ['Contact & Financial Details']));
       var inputs = {};
       fields.forEach(function(f) {
         var fg = h('div', { className: 'form-group' });
@@ -1695,7 +2074,7 @@ function openProspectDetail(id) {
         h('button', { className: 'btn-danger btn-sm', onClick: function() {
           if (confirm('Delete ' + p.firstName + ' ' + p.lastName + '?')) {
             prospects = prospects.filter(function(pr) { return pr.id !== p.id; });
-            closeModal(); toast('Deleted'); render(); updateAlertBadge();
+            closeModal(); toast('Deleted'); saveState(); render(); updateAlertBadge();
           }
         } }, ['Delete']),
         h('div', { style: { display: 'flex', gap: '8px' } }, [
@@ -1716,8 +2095,11 @@ function openProspectDetail(id) {
             p.engagement = inputs.engagement.value;
             p.stage = inputs.stage.value;
             p.notes = inputs.notes.value.trim();
+            p.nextAction = nmActionInp.value.trim();
+            p.nextActionDate = nmDateInp.value || '';
+            p.targetAskAmount = parseFloat(nmAskInp.value) || 0;
             scoreProspect(p);
-            closeModal(); toast('Updated'); render(); updateAlertBadge();
+            closeModal(); toast('Updated'); saveState(); render(); updateAlertBadge();
           } }, ['Save Changes'])
         ])
       ]));
@@ -1865,7 +2247,7 @@ function importRows(rows, mapping) {
       stage: parseStage(row[rev.stage]),
       notes: (row[rev.notes] || '').toString().trim(),
       engagement: parseEng(row[rev.engagement]),
-      score: 0, factors: {}
+      score: 0, factors: {}, activityLog: [], nextAction: '', nextActionDate: '', targetAskAmount: 0
     };
     p.customData = {};
     customWeights.forEach(function(cw) {
@@ -1877,7 +2259,7 @@ function importRows(rows, mapping) {
     count++;
   });
   toast('Imported ' + count + ' prospects!');
-  render(); updateAlertBadge();
+  saveState(); render(); updateAlertBadge();
 }
 
 function parseNum(v) { if (v == null || v === '') return 0; var n = parseFloat(String(v).replace(/[^0-9.\-]/g, '')); return isNaN(n) ? 0 : n; }
@@ -1951,12 +2333,12 @@ window.showAddProspectModal = function() {
         lastContact: inputs.lastContact.value ? new Date(inputs.lastContact.value) : null,
         engagement: inputs.engagement.value, stage: inputs.stage.value,
         notes: inputs.notes.value.trim(), score: 0, factors: {},
-        customData: {}
+        customData: {}, activityLog: [], nextAction: '', nextActionDate: '', targetAskAmount: 0
       };
       if (!p.salary && p.occupation) p.salary = estimateSalary(p.occupation);
       scoreProspect(p);
       prospects.push(p);
-      closeModal(); toast('Added ' + fn + ' ' + ln); render(); updateAlertBadge();
+      closeModal(); toast('Added ' + fn + ' ' + ln); saveState(); render(); updateAlertBadge();
     } }, ['Add Prospect'])
   ]));
   overlay.appendChild(modal);
@@ -1975,14 +2357,14 @@ window.exportFullReport = function() {
       Stage: p.stage, Pledge: p.pledge, 'Lifetime Giving': p.lifetime,
       'Home Value': p.homeValue, 'Est. Salary': p.salary,
       'Last Contact': p.lastContact ? fmtDate(p.lastContact) : '',
-      'Days Since Contact': daysSince(p.lastContact) < 999 ? daysSince(p.lastContact) : '',
+      'Days Since Contact': daysSince(effectiveLastContact(p)) < 999 ? daysSince(effectiveLastContact(p)) : '',
       Engagement: p.engagement, Notes: p.notes
     };
   });
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(s1), 'All Prospects Ranked');
 
   var s2 = sorted.map(function(p) {
-    var ds = daysSince(p.lastContact);
+    var ds = daysSince(effectiveLastContact(p));
     return { Name: (p.firstName+' '+p.lastName).trim(), Score: p.score, Stage: p.stage,
       Urgency: ds >= 180 ? 'Critical' : ds >= 90 ? 'High' : 'Normal',
       'Days Since Contact': ds < 999 ? ds : 'Unknown',
@@ -2201,7 +2583,7 @@ function processChat(q) {
       msg += '2. ASK READY: ' + byStage.Solicit.length + ' prospect' + (byStage.Solicit.length !== 1 ? 's' : '') + ' in Solicit stage. Top target: ' + topSolicit.firstName + ' ' + topSolicit.lastName + ' (Score: ' + topSolicit.score + ', Pledge: ' + fmt$(topSolicit.pledge) + '). Schedule the meeting.\n\n';
     }
     if (byStage.Cultivate.length > 0) {
-      var stale = byStage.Cultivate.filter(function(p) { return daysSince(p.lastContact) > 60; });
+      var stale = byStage.Cultivate.filter(function(p) { return daysSince(effectiveLastContact(p)) > 60; });
       if (stale.length > 0) msg += '3. PIPELINE: ' + stale.length + ' Cultivate prospects are overdue (60+ days). Re-engage before they cool off.\n\n';
       else msg += '3. PIPELINE: Your ' + byStage.Cultivate.length + ' Cultivate prospects are on track. Keep building those relationships.\n\n';
     }
@@ -2249,8 +2631,8 @@ function processChat(q) {
     var avgScore = Math.round(prospects.reduce(function(s, p) { return s + p.score; }, 0) / prospects.length);
     var avgPledge = Math.round(prospects.reduce(function(s, p) { return s + (p.pledge || 0); }, 0) / prospects.length);
     var avgLifetime = Math.round(prospects.reduce(function(s, p) { return s + (p.lifetime || 0); }, 0) / prospects.length);
-    var avgDays = prospects.filter(function(p) { return daysSince(p.lastContact) < 999; });
-    var avgContact = avgDays.length > 0 ? Math.round(avgDays.reduce(function(s, p) { return s + daysSince(p.lastContact); }, 0) / avgDays.length) : 'N/A';
+    var avgDays = prospects.filter(function(p) { return daysSince(effectiveLastContact(p)) < 999; });
+    var avgContact = avgDays.length > 0 ? Math.round(avgDays.reduce(function(s, p) { return s + daysSince(effectiveLastContact(p)); }, 0) / avgDays.length) : 'N/A';
     addBotMsg('Portfolio Averages:\n\n' +
       '\u2022 Average score: ' + avgScore + '/100\n' +
       '\u2022 Average pledge: ' + fmt$(avgPledge) + '\n' +
@@ -2377,12 +2759,12 @@ function processChat(q) {
     var found = prospects.find(function(p) { return (p.firstName + ' ' + p.lastName).toLowerCase().indexOf(nameStr) !== -1; });
     if (!found) { addBotMsg('I couldn\'t find "' + nameStr + '".'); return; }
     if (targetStage) {
-      found.stage = targetStage; scoreProspect(found); render(); updateAlertBadge();
+      found.stage = targetStage; scoreProspect(found); saveState(); render(); updateAlertBadge();
       addBotMsg('Done! Moved ' + found.firstName + ' ' + found.lastName + ' to ' + targetStage + '. ' + getRecommendation(found));
     } else {
       var idx = STAGES.indexOf(found.stage);
       if (idx < STAGES.length - 1) {
-        found.stage = STAGES[idx + 1]; render(); updateAlertBadge();
+        found.stage = STAGES[idx + 1]; saveState(); render(); updateAlertBadge();
         addBotMsg('Advanced ' + found.firstName + ' to ' + found.stage + '. Next action: ' + getRecommendation(found));
       } else { addBotMsg(found.firstName + ' is already at Steward (final stage). Focus on impact updates and referral asks.'); }
     }
@@ -2415,7 +2797,7 @@ function processChat(q) {
     msg += '\u2022 ' + fmt$(totalLifetime) + ' lifetime giving\n';
     msg += '\u2022 Average score: ' + avgScore + '/100\n';
     msg += '\u2022 Top prospect: ' + topScorer.firstName + ' ' + topScorer.lastName + ' (' + topScorer.score + ')\n\n';
-    var overdue = prospects.filter(function(p) { return daysSince(p.lastContact) > 90; }).length;
+    var overdue = prospects.filter(function(p) { return daysSince(effectiveLastContact(p)) > 90; }).length;
     if (overdue > 0) msg += '\u26A0 ' + overdue + ' prospect' + (overdue !== 1 ? 's' : '') + ' overdue for contact.\n';
     var highEngagement = prospects.filter(function(p) { return p.engagement === 'high'; }).length;
     msg += '\u2705 ' + highEngagement + ' high-engagement prospects.';
@@ -2465,15 +2847,15 @@ function processChat(q) {
   if (/\b(today|this\s*week|what.*do|action\s*plan|to.?do|priorities|priority)\b/.test(lower)) {
     var msg = 'Your Priority Actions:\n\n';
     var actionNum = 1;
-    var crit = prospects.filter(function(p) { return daysSince(p.lastContact) >= appSettings.alertThresholdCritical; }).sort(function(a, b) { return b.score - a.score; });
+    var crit = prospects.filter(function(p) { return daysSince(effectiveLastContact(p)) >= appSettings.alertThresholdCritical; }).sort(function(a, b) { return b.score - a.score; });
     if (crit.length > 0) { msg += actionNum++ + '. CONTACT NOW: ' + crit[0].firstName + ' ' + crit[0].lastName + ' (' + daysSince(crit[0].lastContact) + ' days silent, Score: ' + crit[0].score + ')\n'; }
     var solicits = prospects.filter(function(p) { return p.stage === 'Solicit'; }).sort(function(a, b) { return b.pledge - a.pledge; });
     if (solicits.length > 0) { msg += actionNum++ + '. SCHEDULE ASK: ' + solicits[0].firstName + ' ' + solicits[0].lastName + ' for ' + fmt$(solicits[0].pledge) + '\n'; }
-    var cultOverdue = prospects.filter(function(p) { return p.stage === 'Cultivate' && daysSince(p.lastContact) > 60; }).sort(function(a, b) { return b.score - a.score; });
+    var cultOverdue = prospects.filter(function(p) { return p.stage === 'Cultivate' && daysSince(effectiveLastContact(p)) > 60; }).sort(function(a, b) { return b.score - a.score; });
     if (cultOverdue.length > 0) { msg += actionNum++ + '. RE-ENGAGE: ' + cultOverdue[0].firstName + ' ' + cultOverdue[0].lastName + ' (Cultivate, ' + daysSince(cultOverdue[0].lastContact) + ' days)\n'; }
     var newProspects = prospects.filter(function(p) { return p.stage === 'Prospect'; }).sort(function(a, b) { return b.score - a.score; });
     if (newProspects.length > 0) { msg += actionNum++ + '. INTRODUCE: ' + newProspects[0].firstName + ' ' + newProspects[0].lastName + ' (highest-scoring new prospect)\n'; }
-    var stewOverdue = prospects.filter(function(p) { return p.stage === 'Steward' && daysSince(p.lastContact) > 90; });
+    var stewOverdue = prospects.filter(function(p) { return p.stage === 'Steward' && daysSince(effectiveLastContact(p)) > 90; });
     if (stewOverdue.length > 0) { msg += actionNum++ + '. THANK: Send impact update to ' + stewOverdue.length + ' steward prospect' + (stewOverdue.length !== 1 ? 's' : '') + '\n'; }
     if (actionNum === 1) msg += 'Everything looks great! Your pipeline is healthy and contacts are up to date.';
     addBotMsg(msg.trim());
@@ -2536,8 +2918,11 @@ function processChat(q) {
 }
 
 // ===== INIT =====
+var hadSavedData = loadState();
+if (currentTheme !== 'default') applyTheme(currentTheme);
 render();
 updateAlertBadge();
+if (hadSavedData) toast('Data restored from local storage');
 
 })();
 </script>
